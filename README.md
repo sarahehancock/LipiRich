@@ -1,4 +1,4 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.0.2-blue" alt="v0.0.2"/> <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.0.2-blue" alt="v0.0.2"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
@@ -272,7 +272,7 @@ LipiRich/
 ├── Dockerfile       # Docker image definition
 ├── README.md        # This file
 ├── CHANGELOG.md     # Version history
-├── LICENSE          # MIT License
+├── LICENSE          # GNU Affero General Public License v3.0
 └── demo_data/       # Example input files (coming soon)
 ```
 
@@ -288,7 +288,9 @@ If you use LipiRich in your research, please cite:
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+
+If you use, modify, or deploy LipiRich as a network service (e.g. a hosted web application), you must make the complete corresponding source code available to users under the same licence. See the [AGPL-3.0 licence text](https://www.gnu.org/licenses/agpl-3.0.html) for full details.
 
 ---
 

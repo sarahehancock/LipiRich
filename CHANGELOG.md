@@ -1,5 +1,7 @@
 # LipiRich Changelog
 
+> LipiRich is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+
 ---
 
 ## [0.0.2] — 2026-06-03
@@ -8,6 +10,9 @@
 Major UI, statistical, and correctness improvements across the export, visualisation, and analysis tabs. This release replaces the underpowered class-level ORA in the Synthesis Pathways tab with a direct score-level group comparison, fixes the volcano plot to show all tested features, corrects group-filtering across downstream tabs, and standardises plot export controls throughout the app.
 
 ---
+
+### Licence change
+Licence changed from MIT to **GNU Affero General Public License v3.0 (AGPL-3.0)**. The AGPL-3.0 extends copyleft protection to network services: anyone who deploys a modified version of LipiRich as a hosted web application must make the corresponding source code available to users. This better reflects the web-app delivery model of LipiRich and protects against commercial rebranding without attribution.
 
 ### New features
 
