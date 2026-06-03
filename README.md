@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.0.1-blue" alt="v0.0.1"/> <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.0.2-blue" alt="v0.0.2"/> <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.5.2, and Bioconductor 3.22.
 
-> ⚠️ **Pre-publication software (v0.0.1):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.0.2):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -21,8 +21,8 @@
 | **PCA** | Principal component analysis with token-based group colouring and sample selection |
 | **Statistics** | Auto t-test / one-way ANOVA / two-way ANOVA with post-hoc tests, volcano plot, and significance heatmap |
 | **Enrichment** | ORA and FGSEA across lipid class, fatty acid identity, saturation, chain length, and ether subclass sets |
-| **Lipid Network** | Pearson correlation network of significant lipid species |
-| **Synthesis Pathways** | Curated enzyme activity proxy scores with ORA enrichment |
+| **Correlation Network** | Pearson correlation network of significant lipid species within a selected group |
+| **Synthesis Pathways** | Curated enzyme activity proxy scores with group comparison statistics |
 | **Settings** | User-editable ion mode preference lists per lipid class |
 
 ---
@@ -194,9 +194,61 @@ The Statistics tab automatically selects the appropriate test based on the numbe
 - **≥ 3 groups** → one-way ANOVA
 - **Two-way design** → two-way ANOVA using Factor A and Factor B defined in the Group Preview tab
 
-Groups to include in the comparison are selected via the group selector on the Statistics tab, which inherits from the Group Preview tab settings. Deselect groups to exclude them from all tests. All downstream tabs (Volcano Plot, Heatmap, Enrichment, Lipid Network) inherit the statistics results from the most recent "Run statistics" click.
+Groups to include in the comparison are selected via the group selector on the Statistics tab, which inherits from the Group Preview tab settings. Deselect groups to exclude them from all tests. All downstream tabs (Volcano Plot, Heatmap, Enrichment, Correlation Network, Synthesis Pathways) inherit the statistics results from the most recent "Run statistics" click, and restrict their outputs to the selected groups only.
 
 Multiple testing correction (FDR/BH, Bonferroni, or none) and significance threshold (α) are configurable. Post-hoc tests (Tukey HSD, pairwise t-tests with Holm correction) are available for ANOVA results.
+
+### Volcano plot
+
+The volcano plot displays **all tested features** regardless of the significance filter applied to the bar plots and table. Points are coloured by direction (up/down/NS) according to the configured log2FC and p-value thresholds. The plot is interactive (hover for feature details) and can be exported as PNG or SVG.
+
+### Significance heatmap
+
+Displays the top N significant features as a z-scored heatmap. Row and column clustering, label visibility, and colour palette (10 options including diverging schemes) are all configurable. Exported as PNG or SVG with user-specified pixel dimensions and DPI.
+
+---
+
+## Correlation Network
+
+The Correlation Network tab computes pairwise **Pearson correlations** among significant lipid species within a selected group. Edges are drawn between species whose correlation exceeds a configurable threshold, with edge width scaled to correlation strength and node colour reflecting direction of change relative to the comparison group.
+
+> This tab is purely correlational — edges reflect co-variation in abundance, not metabolic pathway connectivity.
+
+Group selection is inherited from the Statistics tab: only groups included in the most recent statistics run are available in the group dropdown.
+
+---
+
+## Synthesis Pathways
+
+The Synthesis Pathways tab provides two views of curated **enzyme activity proxy scores** — lipid class ratios and fractions designed to reflect the relative activity of key lipid synthesis enzymes (e.g. Kennedy pathway, PEMT, sphingomyelin synthase, ether lipid synthesis).
+
+### Scores heatmap
+
+Each row is a pathway score; each column is a sample (or group mean). Values are z-scored by row to highlight relative differences across groups. Colour palette, clustering, and export dimensions are configurable.
+
+### Score statistics
+
+Runs a **t-test** (2 groups) or **one-way ANOVA** (≥ 3 groups) on each score's sample values across the groups selected in the Statistics tab, with BH correction applied across all scores. Results are displayed as:
+
+- A **lollipop plot** of −log10(p_adj) per score, sorted by significance and coloured by which group has the higher mean.
+- A **results table** with score name, test type, groups compared, test statistic, log2FC (t-test only), direction, p, and p_adj.
+
+> Scores are currently based on lipid class-level totals. Acyl chain-resolved scoring is planned for a future release.
+
+---
+
+## Plot Export
+
+All tabs with plots include consistent export controls:
+
+| Control | Description |
+|---|---|
+| **Width / Height (px)** | Output dimensions in pixels |
+| **DPI** | Resolution for raster outputs (PNG) |
+| **Scale fraction** | Scales the final plot size (0.25–2.0×) |
+| **Base font size** | Controls axis label and annotation text size |
+
+PNG and SVG formats are available on all plot tabs. The Statistics tab additionally offers a **batch PDF export** that produces one bar plot per significant feature across all pages.
 
 ---
 
@@ -219,6 +271,7 @@ LipiRich/
 ├── packages.R       # R package installer (run once before first use)
 ├── Dockerfile       # Docker image definition
 ├── README.md        # This file
+├── CHANGELOG.md     # Version history
 ├── LICENSE          # MIT License
 └── demo_data/       # Example input files (coming soon)
 ```
@@ -229,7 +282,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2025). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.0.1). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2025). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.0.2). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 
@@ -250,3 +303,4 @@ LipiRich builds on the following open-source R packages and tools:
 - [visNetwork](https://cran.r-project.org/package=visNetwork) — Almende B.V.
 - [plotly](https://plotly.com/r/) — Sievert et al.
 - [pheatmap](https://cran.r-project.org/package=pheatmap) — Kolde et al.
+- [viridis](https://cran.r-project.org/package=viridis) — Garnier et al.

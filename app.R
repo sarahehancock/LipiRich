@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.0.1
+# LipiRich v0.0.2
 # --------------------------
 # A Shiny application for normalisation, statistics, and visualisation
 # of MS-DIAL lipidomics alignment output data.
@@ -8,11 +8,11 @@
 # Author:   Hancock, SE.
 # GitHub:   https://github.com/sarahehancock/LipiRich
 # License:  MIT
-# Version:  0.0.1
+# Version:  0.0.11
 # Tested with: MS-DIAL 5.5.251021, R 4.5.2, Bioconductor 3.22
 # --------------------------
 
-APP_VERSION <- "0.0.1"
+APP_VERSION <- "0.0.2"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -516,13 +516,13 @@ landing_page_ui <- function() {
           ),
           div(class = "workflow-card",
               div(class = "step-num", "Step 10"),
-              div(class = "step-title", "Lipid Network"),
-              div(class = "step-desc", "Pearson correlation network of significant lipid species within a selected group, with interactive visualisation via visNetwork.")
+              div(class = "step-title", "Correlation Network"),
+              div(class = "step-desc", "Pearson correlation network of significant lipid species within a selected group. Node colour reflects direction of change; edge width reflects correlation strength.")
           ),
           div(class = "workflow-card",
               div(class = "step-num", "Step 11"),
               div(class = "step-title", "Synthesis Pathways"),
-              div(class = "step-desc", "Curated pathway scores (enzyme activity proxies) displayed as a heatmap, with optional class-level ORA enrichment.")
+              div(class = "step-desc", "Curated enzyme activity proxy scores (lipid class ratios) displayed as a z-scored heatmap, with group comparison statistics (t-test or one-way ANOVA per score) to identify significantly shifted pathway activities.")
           )
       ),
       
@@ -603,7 +603,7 @@ landing_page_ui <- function() {
       tags$p("If you use LipiRich in your research, please cite:"),
       div(class = "cite-box",
           "Hancock, SE. (2025). LipiRich: A Shiny application for normalisation,
-statistics, and visualisation of MS-DIAL lipidomics data (v0.0.1).
+statistics, and visualisation of MS-DIAL lipidomics data (v0.0.2).
 GitHub: https://github.com/sarahehancock/LipiRich
 DOI: [pending]"
       ),
@@ -1320,29 +1320,35 @@ ui <- fluidPage(
                        ),
                        checkboxInput("stats_plot_points", "Overlay individual points", value = TRUE),
                        hr(),
-                       h5("Export significant plots (PDF)"),
+                       h5("Export significant plots"),
                        helpText(tags$small(
                          "Downloads one bar plot per significant feature as a multi-page PDF,",
                          "matching exactly what is shown on the statistics tab including",
                          "significance brackets, error bars, and individual points."
                        )),
+                       numericInput("stats_export_width",    "Width (px)",      1200, 400, 4000, 50),
+                       numericInput("stats_export_height",   "Height (px)",      700, 300, 4000, 50),
+                       numericInput("stats_export_dpi",      "DPI",              300,  72,  600, 12),
+                       numericInput("stats_export_scale",    "Scale fraction",  1.00, 0.25, 2.00, 0.05),
+                       numericInput("stats_export_fontsize", "Base font size",    14,    6,   24,  1),
                        fluidRow(
-                         column(6, numericInput("stats_pdf_width",  "Width (in)",  value = 7,  min = 3, max = 20, step = 0.5)),
-                         column(6, numericInput("stats_pdf_height", "Height (in)", value = 5,  min = 3, max = 20, step = 0.5))
+                         column(6, downloadButton("download_stats_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_stats_svg", "SVG"))
                        ),
-                       selectInput("stats_pdf_dpi", "Resolution (DPI)",
-                                   choices = c("72 — screen" = "72",
-                                               "150 — draft print" = "150",
-                                               "300 — publication" = "300"),
-                                   selected = "300"),
-                       radioButtons("stats_pdf_scale", "Plot scaling:",
-                                    choices = c("Fit one per page"            = "single",
-                                                "2 per page (side by side)"   = "two",
-                                                "4 per page (2 × 2 grid)"     = "four"),
+                       hr(),
+                       h5("Batch PDF export"),
+                       helpText(tags$small(
+                         "Exports all significant plots as a multi-page PDF.",
+                         "Uses width/height/DPI settings above."
+                       )),
+                       radioButtons("stats_pdf_scale", "Layout:",
+                                    choices = c("1 per page"        = "single",
+                                                "2 per page"        = "two",
+                                                "4 per page (2×2)"  = "four"),
                                     selected = "single",
                                     inline   = TRUE),
                        downloadButton("download_stats_pdf",
-                                      label = "Download significant plots (PDF)",
+                                      label = "Download PDF",
                                       icon  = icon("file-pdf"),
                                       style = "width:100%; margin-top:4px;")
                      )
@@ -1368,8 +1374,16 @@ ui <- fluidPage(
                        numericInput("volcano_topn_labels",
                                     "Max labels:", value = 20, min = 0, max = 100),
                        helpText("Run Statistics first to populate this plot."),
-                       br(),
-                       downloadButton("download_volcano", "Download plot (PNG)")
+                       hr(),
+                       h5("Export plot"),
+                       numericInput("volc_export_width",  "Width (px)",  1200, 400, 4000, 50),
+                       numericInput("volc_export_height", "Height (px)",  700, 300, 4000, 50),
+                       numericInput("volc_export_dpi",    "DPI",          300,  72,  600, 12),
+                       numericInput("volc_export_scale",  "Scale fraction", 1.00, 0.25, 2.00, 0.05),
+                       fluidRow(
+                         column(6, downloadButton("download_volcano_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_volcano_svg", "SVG"))
+                       )
                      )
                    ),
                    column(
@@ -1403,18 +1417,36 @@ ui <- fluidPage(
                                    selected = "complete"),
                        checkboxInput("hm_cluster_rows", "Cluster rows (features)", TRUE),
                        checkboxInput("hm_cluster_cols", "Cluster columns", TRUE),
+                       checkboxInput("hm_show_rownames", "Show row labels (features)", TRUE),
+                       checkboxInput("hm_show_colnames", "Show column labels (samples)", TRUE),
+                       selectInput("hm_palette", "Colour palette",
+                                   choices = c(
+                                     "Viridis"              = "viridis",
+                                     "Magma"                = "magma",
+                                     "Plasma"               = "plasma",
+                                     "Inferno"              = "inferno",
+                                     "Cividis"              = "cividis",
+                                     "Rocket"               = "rocket",
+                                     "Mako"                 = "mako",
+                                     "Turbo"                = "turbo",
+                                     "Blue–White–Red"       = "bwr",
+                                     "Green–White–Purple"   = "gwp"
+                                   ),
+                                   selected = "viridis"),
                        numericInput("hm_topn", "Top N features (by adjusted p)", value = 50, min = 2, max = 300, step = 1),
                        br(),
                        downloadButton("download_sig_hm_matrix", "Download matrix (CSV)"),
                        hr(),
-                       h5("Download heatmap image"),
-                       selectInput("sig_hm_format", "Format", choices = c("PNG" = "png", "SVG" = "svg"), selected = "png"),
+                       h5("Export heatmap"),
+                       numericInput("hm_export_width",    "Width (px)",      1100, 400, 4000, 50),
+                       numericInput("hm_export_height",   "Height (px)",      900, 300, 4000, 50),
+                       numericInput("hm_export_dpi",      "DPI",              300,  72,  600, 12),
+                       numericInput("hm_export_scale",    "Scale fraction",  1.00, 0.25, 2.00, 0.05),
+                       numericInput("hm_export_fontsize", "Base font size",    10,    6,   24,  1),
                        fluidRow(
-                         column(6, numericInput("sig_hm_width",  "Width (in)",  value = 8, min = 4,  max = 30, step = 0.5)),
-                         column(6, numericInput("sig_hm_height", "Height (in)", value = 6, min = 3,  max = 30, step = 0.5))
-                       ),
-                       numericInput("sig_hm_dpi", "PNG DPI", value = 300, min = 96, max = 600, step = 12),
-                       downloadButton("download_sig_hm_plot", "Download heatmap (SVG/PNG)")
+                         column(6, downloadButton("download_hm_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_hm_svg", "SVG"))
+                       )
                        
                      )
                    ),
@@ -1505,14 +1537,16 @@ ui <- fluidPage(
                        br(), br(),
                        downloadButton("download_lsea_table", "Download results (CSV)"),
                        hr(),
-                       h5("Download enrichment plot"),
-                       selectInput("lsea_plot_format", "Format", choices = c("SVG" = "svg", "PNG" = "png"), selected = "svg"),
+                       h5("Export enrichment plot"),
+                       numericInput("lsea_export_width",    "Width (px)",      1200, 400, 4000, 50),
+                       numericInput("lsea_export_height",   "Height (px)",      700, 300, 4000, 50),
+                       numericInput("lsea_export_dpi",      "DPI",              300,  72,  600, 12),
+                       numericInput("lsea_export_scale",    "Scale fraction",  1.00, 0.25, 2.00, 0.05),
+                       numericInput("lsea_export_fontsize", "Base font size",    11,    6,   24,  1),
                        fluidRow(
-                         column(6, numericInput("lsea_plot_width",  "Width (in)",  value = 8, min = 4,  max = 30, step = 0.5)),
-                         column(6, numericInput("lsea_plot_height", "Height (in)", value = 6, min = 3,  max = 30, step = 0.5))
-                       ),
-                       numericInput("lsea_plot_dpi", "PNG DPI", value = 300, min = 96, max = 600, step = 12),
-                       downloadButton("download_lsea_plot", "Download plot (SVG/PNG)")
+                         column(6, downloadButton("download_lsea_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_lsea_svg", "SVG"))
+                       )
                        
                      )
                    ),
@@ -1525,13 +1559,14 @@ ui <- fluidPage(
                    )
                  )
         ),
-        tabPanel("Lipid Network",
+        tabPanel("Correlation Network",
                  h4("Lipid Correlation Network"),
                  fluidRow(
                    column(
                      width = 3,
                      wellPanel(
                        h5("Group & data"),
+                       uiOutput("net_group_token_ui"),
                        selectInput("net_group",
                                    "Compute correlations within group:",
                                    choices = c()),
@@ -1599,43 +1634,52 @@ ui <- fluidPage(
                                      "Percent of total lipids" = "percent_total"),
                          selected = "absolute"
                        ),
-                       selectInput(
-                         "path_grouping_method", "How to group samples:",
-                         choices = c("By sample", "Delimiter-based", "Regex capture group"),
-                         selected = "Delimiter-based"
-                       ),
-                       conditionalPanel(
-                         condition = "input.path_grouping_method == 'Delimiter-based'",
-                         selectInput("path_group_delim", "Delimiter",
-                                     choices = c("_" = "_", "-" = "-", "space" = " ", "." = ".", "/" = "/"),
-                                     selected = "_"),
-                         numericInput("path_group_tokens", "Use first N tokens as group", value = 1, min = 1, max = 5, step = 1)
-                       ),
-                       conditionalPanel(
-                         condition = "input.path_grouping_method == 'Regex capture group'",
-                         textInput("path_group_regex", "Regex with ONE capture group", value = "^([^_]+)")
-                       ),
+                       uiOutput("path_group_token_ui"),
+                       selectInput("path_hm_palette", "Colour palette",
+                                   choices = c(
+                                     "Viridis"              = "viridis",
+                                     "Magma"                = "magma",
+                                     "Plasma"               = "plasma",
+                                     "Inferno"              = "inferno",
+                                     "Cividis"              = "cividis",
+                                     "Rocket"               = "rocket",
+                                     "Mako"                 = "mako",
+                                     "Turbo"                = "turbo",
+                                     "Blue–White–Red"       = "bwr",
+                                     "Green–White–Purple"   = "gwp"
+                                   ),
+                                   selected = "viridis"),
                        checkboxInput("path_use_group_means", "Use group means (collapse replicates)", TRUE),
                        selectizeInput("path_scores_select", "Scores to display", multiple = TRUE, choices = c(),
                                       options = list(placeholder = "Select scores (defaults to all)")),
                        hr(),
-                       h5("Class-set ORA (optional)"),
-                       checkboxInput("path_do_ora", "Run ORA on class sets", TRUE),
-                       checkboxInput("path_ora_up_only", "ORA: hits must be up in selected group (log2FC > 0)", TRUE),
-                       
-                       checkboxInput("path_ora_only_overlap",
-                                     "ORA: show sets with ≥1 overlapping hit",
-                                     TRUE),
-                       radioButtons("path_ora_direction", "Direction for class hits",
-                                    choices  = c("Up only" = "up", "Down only" = "down", "Either" = "both"),
-                                    selected = "up"),
-                       selectizeInput("path_group_select", "Group(s) for ORA", multiple = TRUE, choices = c()),
+                       h5("Score statistics"),
+                       helpText(tags$small(
+                         "Runs a t-test (2 groups) or one-way ANOVA (≥3 groups) on each",
+                         "score's sample values. BH correction is applied across all scores."
+                       )),
                        selectInput("path_padj_method", "Multiple testing correction:",
                                    choices = c("FDR (BH)" = "BH", "Bonferroni" = "bonferroni", "None" = "none"),
                                    selected = "BH"),
                        numericInput("path_alpha", "Significance threshold (α):", value = 0.05, min = 0.0001, max = 0.2, step = 0.005),
+                       checkboxInput("path_stats_equal_var", "Assume equal variance (t-test)", value = FALSE),
                        br(),
-                       downloadButton("download_path_scores", "Download scores (CSV)")
+                       downloadButton("download_path_scores", "Download scores (CSV)"),
+                       hr(),
+                       h5("Export plots"),
+                       numericInput("path_export_width",    "Width (px)",      1400, 400, 5000, 50),
+                       numericInput("path_export_height",   "Height (px)",      900, 300, 5000, 50),
+                       numericInput("path_export_dpi",      "DPI",              300,  72,  600, 12),
+                       numericInput("path_export_scale",    "Scale fraction",  1.00, 0.25, 4.00, 0.05),
+                       numericInput("path_export_fontsize", "Base font size",    11,    6,   24,  1),
+                       selectInput("path_export_plot_sel", "Plot to export",
+                                   choices = c("Scores heatmap"   = "heatmap",
+                                               "Score statistics" = "scorestats"),
+                                   selected = "heatmap"),
+                       fluidRow(
+                         column(6, downloadButton("download_path_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_path_svg", "SVG"))
+                       )
                      )
                    ),
                    column(
@@ -1644,9 +1688,9 @@ ui <- fluidPage(
                        tabPanel("Scores heatmap",
                                 plotOutput("pathHeatmap", height = "560px"),
                                 br(), DT::DTOutput("pathScoresTable")),
-                       tabPanel("ORA enrichment",
-                                plotOutput("pathOraPlot", height = "560px"),
-                                br(), DT::DTOutput("pathOraTable"))
+                       tabPanel("Score statistics",
+                                plotOutput("pathStatsPlot", height = "520px"),
+                                br(), DT::DTOutput("pathStatsTable"))
                      )
                    )
                  )
@@ -1934,6 +1978,8 @@ server <- function(input, output, session) {
   
   output$pca_group_token_ui   <- renderUI({ .token_mirror_ui() })
   output$stats_group_token_ui <- renderUI({ .token_mirror_ui() })
+  output$path_group_token_ui  <- renderUI({ .token_mirror_ui() })
+  output$net_group_token_ui   <- renderUI({ .token_mirror_ui() })
   
   # ── Central grouping reactive — single source of truth ───────────────────────
   # Returns a named list: list(group = vector, factorA = vector, factorB = vector)
@@ -2055,6 +2101,19 @@ server <- function(input, output, session) {
   # ── Plot tab group reactiveVals ───────────────────────────────────────────────
   met_available_groups       <- reactiveVal(character(0))
   class_all_available_groups <- reactiveVal(character(0))
+  net_available_groups       <- reactiveVal(character(0))
+  
+  # Network group selector — only groups that were included in statistics
+  observe({
+    all_grps  <- tryCatch(.refresh_available_groups(), error = function(e) character(0))
+    sel_grps  <- input$stats_selected_groups
+    # If stats groups are set, restrict to those; otherwise fall back to all
+    net_grps  <- if (!is.null(sel_grps) && length(sel_grps) > 0)
+      intersect(all_grps, sel_grps)
+    else
+      all_grps
+    net_available_groups(net_grps)
+  })
   
   # Plot single lipid — group selector
   output$met_group_select_ui <- renderUI({
@@ -2124,9 +2183,23 @@ server <- function(input, output, session) {
   #----ReactiveVal for stats
   
   stats_results_val <- reactiveVal(NULL)
+  stats_results_all <- reactiveVal(NULL)  # always full unfiltered results for volcano
   
   observeEvent(input$run_stats, {
-    # Calculate statistics and store in stats_results_val
+    # Full unfiltered results — always all tested features (used by volcano plot)
+    all_stats <- .compute_stats_results(
+      df = stats_input_long(),
+      test_choice = input$stats_test,
+      equal_var = isTRUE(input$ttest_equal_var),
+      tw_filter = input$twoway_effect_filter,
+      alpha = input$alpha %||% 0.05,
+      padj_method = input$padj_method,
+      use_adj = isTRUE(input$use_adj_threshold),
+      show_all_rows_flag = TRUE  # always keep all rows
+    )
+    stats_results_all(all_stats)
+    
+    # Filtered results — respects show_all_rows toggle (used by bar plots, heatmap, etc.)
     stats <- .compute_stats_results(
       df = stats_input_long(),
       test_choice = input$stats_test,
@@ -3306,10 +3379,27 @@ server <- function(input, output, session) {
   # ── Shared plot reactives for bulk export ────────────────────────────────────
   # These build the ggplot/pheatmap objects reused by both renderPlot and download_stats_pdf
   
+  # Shared palette helper — returns a 101-colour vector for pheatmap
+  .heatmap_palette <- function(palette_id, n = 101) {
+    switch(palette_id,
+           "viridis"  = viridis::viridis(n,  option = "viridis"),
+           "magma"    = viridis::viridis(n,  option = "magma"),
+           "plasma"   = viridis::viridis(n,  option = "plasma"),
+           "inferno"  = viridis::viridis(n,  option = "inferno"),
+           "cividis"  = viridis::viridis(n,  option = "cividis"),
+           "rocket"   = viridis::viridis(n,  option = "rocket"),
+           "mako"     = viridis::viridis(n,  option = "mako"),
+           "turbo"    = viridis::viridis(n,  option = "turbo"),
+           "bwr"      = colorRampPalette(c("#2166ac", "#f7f7f7", "#d6604d"))(n),
+           "gwp"      = colorRampPalette(c("#1b7837", "#f7f7f7", "#762a83"))(n),
+           viridis::viridis(n, option = "viridis")  # default fallback
+    )
+  }
+  
   heatmap_plot_obj <- reactive({
     hd <- tryCatch(sig_heatmap_data(), error = function(e) NULL)
     if (is.null(hd)) return(NULL)
-    cols <- colorRampPalette(c("#2c7bb6", "#ffffbf", "#d7191c"))(101)
+    cols <- .heatmap_palette(input$hm_palette %||% "viridis")
     pheatmap::pheatmap(
       hd$mat,
       color            = cols,
@@ -3319,8 +3409,8 @@ server <- function(input, output, session) {
       clustering_distance_cols = input$hm_dist %||% "correlation",
       clustering_method = input$hm_linkage %||% "complete",
       annotation_col   = if (!is.null(hd$anno_col) && ncol(hd$anno_col) > 0) hd$anno_col else NULL,
-      show_rownames    = TRUE,
-      show_colnames    = TRUE,
+      show_rownames    = isTRUE(input$hm_show_rownames),
+      show_colnames    = isTRUE(input$hm_show_colnames),
       fontsize_row     = 8,
       fontsize_col     = 9,
       border_color     = NA,
@@ -3379,7 +3469,7 @@ server <- function(input, output, session) {
       pheatmap::pheatmap(
         mat,
         cluster_rows = TRUE, cluster_cols = TRUE,
-        show_colnames = TRUE, show_rownames = TRUE,
+        show_colnames = isTRUE(input$hm_show_colnames), show_rownames = isTRUE(input$hm_show_rownames),
         fontsize_row = 8, fontsize_col = 8,
         border_color = NA,
         main = "Synthesis pathway scores",
@@ -4932,8 +5022,8 @@ server <- function(input, output, session) {
     # Rough scaling: 0.25in per feature, capped
     w_default <- 8
     h_default <- max(6, min(25, 0.25 * hd$n_feats))
-    updateNumericInput(session, "sig_hm_width",  value = w_default)
-    updateNumericInput(session, "sig_hm_height", value = h_default)
+    updateNumericInput(session, "hm_export_width",  value = round(w_default * 300))
+    updateNumericInput(session, "hm_export_height", value = round(h_default * 300))
   })
   
   
@@ -4943,7 +5033,7 @@ server <- function(input, output, session) {
     hd  <- sig_heatmap_data()
     mat <- hd$mat
     anno_col   <- hd$anno_col
-    cols       <- colorRampPalette(c("#2c7bb6", "#ffffbf", "#d7191c"))(101)
+    cols       <- .heatmap_palette(input$hm_palette %||% "viridis")
     dist_opt   <- input$hm_dist    %||% "correlation"
     method_opt <- input$hm_linkage %||% "complete"
     pheatmap::pheatmap(
@@ -4955,8 +5045,8 @@ server <- function(input, output, session) {
       clustering_distance_cols = dist_opt,
       clustering_method = method_opt,
       annotation_col   = if (ncol(anno_col) > 0) anno_col else NULL,
-      show_rownames    = TRUE,
-      show_colnames    = TRUE,
+      show_rownames    = isTRUE(input$hm_show_rownames),
+      show_colnames    = isTRUE(input$hm_show_colnames),
       fontsize_row     = 8,
       fontsize_col     = 9,
       border_color     = NA,
@@ -4983,65 +5073,65 @@ server <- function(input, output, session) {
   
   
   
-  output$download_sig_hm_plot <- downloadHandler(
-    filename = function() {
-      fmt <- input$sig_hm_format %||% "png"
-      paste0("heatmap_significant_", input$stats_class, "_", Sys.Date(), ".", fmt)
-    },
+  .hm_export_dims <- function() {
+    px_w  <- input$hm_export_width    %||% 1100
+    px_h  <- input$hm_export_height   %||% 900
+    dpi   <- input$hm_export_dpi      %||% 300
+    scale <- input$hm_export_scale    %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+  
+  .build_sig_heatmap <- function(fsz = 10) {
+    hd <- sig_heatmap_data()
+    if (is.null(hd)) return(NULL)
+    pheatmap::pheatmap(
+      hd$mat,
+      color = .heatmap_palette(input$hm_palette %||% "viridis"),
+      cluster_rows = isTRUE(input$hm_cluster_rows),
+      cluster_cols = isTRUE(input$hm_cluster_cols),
+      clustering_distance_rows = input$hm_dist    %||% "correlation",
+      clustering_distance_cols = input$hm_dist    %||% "correlation",
+      clustering_method        = input$hm_linkage %||% "complete",
+      annotation_col = if (ncol(hd$anno_col) > 0) hd$anno_col else NULL,
+      show_rownames = isTRUE(input$hm_show_rownames),
+      show_colnames = isTRUE(input$hm_show_colnames),
+      fontsize_row = fsz, fontsize_col = fsz + 1,
+      border_color = NA,
+      main = paste0("Significant features heatmap — ", hd$class),
+      silent = TRUE
+    )
+  }
+  
+  output$download_hm_png <- downloadHandler(
+    filename = function() paste0("heatmap_significant_", isolate(input$stats_class), "_", Sys.Date(), ".png"),
     content = function(file) {
-      # Rebuild the heatmap the same way as in renderPlot
-      hd <- sig_heatmap_data()
-      mat <- hd$mat
-      anno_col <- hd$anno_col
-      cols <- colorRampPalette(c("#2c7bb6", "#ffffbf", "#d7191c"))(101)
-      dist_opt <- input$hm_dist %||% "correlation"
-      method_opt <- input$hm_linkage %||% "complete"
-      
-      # pheatmap in silent mode returns a gtable we can draw into any device
-      hm <- pheatmap::pheatmap(
-        mat,
-        color = cols,
-        cluster_rows = isTRUE(input$hm_cluster_rows),
-        cluster_cols = isTRUE(input$hm_cluster_cols),
-        clustering_distance_rows = dist_opt,
-        clustering_distance_cols = dist_opt,
-        clustering_method = method_opt,
-        annotation_col = if (ncol(anno_col) > 0) anno_col else NULL,
-        show_rownames = TRUE,
-        show_colnames = TRUE,
-        fontsize_row = 8,
-        fontsize_col = 9,
-        border_color = NA,
-        main = paste0("Significant features heatmap — ", hd$class),
-        silent = TRUE
-      )
-      
-      # Device settings
-      fmt <- input$sig_hm_format %||% "png"
-      w   <- input$sig_hm_width  %||% 8
-      h   <- input$sig_hm_height %||% 6
-      dpi <- input$sig_hm_dpi    %||% 300
-      
-      # Open the appropriate device
-      if (identical(fmt, "svg")) {
-        # Prefer svglite if available; otherwise fall back to grDevices::svg
-        if (requireNamespace("svglite", quietly = TRUE)) {
-          svglite::svglite(file, width = w, height = h)
-        } else {
-          grDevices::svg(file, width = w, height = h)
-        }
-      } else { # png
-        grDevices::png(file, width = w, height = h, units = "in", res = dpi)
-      }
+      dims <- isolate(.hm_export_dims())
+      fsz  <- isolate(input$hm_export_fontsize %||% 10)
+      hm   <- isolate(.build_sig_heatmap(fsz))
+      validate(need(!is.null(hm), "No heatmap to export. Run statistics first."))
+      grDevices::png(file,
+                     width  = round(dims$w * dims$dpi),
+                     height = round(dims$h * dims$dpi),
+                     res    = dims$dpi)
       on.exit(grDevices::dev.off(), add = TRUE)
-      
-      tryCatch({
-        grid::grid.newpage()
-        grid::grid.draw(hm$gtable)
-      }, error = function(e) {
-        showNotification(paste("Heatmap download error:", e$message), type = "error", duration = 8)
-      })
-      
+      grid::grid.newpage()
+      grid::grid.draw(hm$gtable)
+    }
+  )
+  
+  output$download_hm_svg <- downloadHandler(
+    filename = function() paste0("heatmap_significant_", isolate(input$stats_class), "_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.hm_export_dims())
+      fsz  <- isolate(input$hm_export_fontsize %||% 10)
+      hm   <- isolate(.build_sig_heatmap(fsz))
+      validate(need(!is.null(hm), "No heatmap to export. Run statistics first."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      grid::grid.newpage()
+      grid::grid.draw(hm$gtable)
     }
   )
   
@@ -5486,6 +5576,11 @@ server <- function(input, output, session) {
     res <- fn(df$sample)
     df$group <- res$group
     
+    # Respect the group selection from the Statistics tab
+    sel_grps <- input$stats_selected_groups
+    if (!is.null(sel_grps) && length(sel_grps) > 0) {
+      df <- df %>% dplyr::filter(group %in% sel_grps)
+    }
     
     # Ensure at least 2 groups for “one-vs-rest”
     if (identical(input$lsea_scope, "group")) {
@@ -5884,46 +5979,37 @@ server <- function(input, output, session) {
   
   
   
-  output$download_lsea_plot <- downloadHandler(
-    filename = function() {
-      fmt <- input$lsea_plot_format %||% "svg"
-      paste0("enrichment_", input$lsea_method, "_", Sys.Date(), ".", fmt)
-    },
+  .lsea_export_dims <- function() {
+    px_w  <- input$lsea_export_width    %||% 1200
+    px_h  <- input$lsea_export_height   %||% 700
+    dpi   <- input$lsea_export_dpi      %||% 300
+    scale <- input$lsea_export_scale    %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+  
+  output$download_lsea_png <- downloadHandler(
+    filename = function() paste0("enrichment_", isolate(input$lsea_method), "_", Sys.Date(), ".png"),
     content = function(file) {
-      p   <- lsea_plot_obj()                      # <- your reactive ggplot
-      fmt <- input$lsea_plot_format %||% "svg"
-      w   <- input$lsea_plot_width  %||% 8
-      h   <- input$lsea_plot_height %||% 6
-      dpi <- input$lsea_plot_dpi    %||% 300      # used only for PNG
-      
-      # Build argument list for ggsave without passing dpi for SVG
-      args <- list(
-        filename = file,
-        plot     = p,
-        width    = w,
-        height   = h
-      )
-      
-      if (identical(fmt, "svg")) {
-        # Prefer svglite, else fall back to built-in svg
-        if (requireNamespace("svglite", quietly = TRUE)) {
-          args$device <- svglite::svglite
-        } else {
-          args$device <- "svg"
-        }
-        # DO NOT set args$dpi for SVG — omit entirely
-      } else {
-        # PNG (raster) — choose high-quality device if available
-        if (requireNamespace("ragg", quietly = TRUE)) {
-          args$device <- ragg::agg_png
-        } else {
-          args$device <- "png"
-        }
-        args$dpi <- dpi
-      }
-      
-      # Call ggsave with the tailored arguments
-      do.call(ggplot2::ggsave, args)
+      dims <- isolate(.lsea_export_dims())
+      p    <- isolate(lsea_plot_obj())
+      validate(need(!is.null(p), "No enrichment plot to export. Run enrichment first."))
+      ggplot2::ggsave(file, plot = p,
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
+    }
+  )
+  
+  output$download_lsea_svg <- downloadHandler(
+    filename = function() paste0("enrichment_", isolate(input$lsea_method), "_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.lsea_export_dims())
+      p    <- isolate(lsea_plot_obj())
+      validate(need(!is.null(p), "No enrichment plot to export. Run enrichment first."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
     }
   )
   
@@ -5980,6 +6066,8 @@ server <- function(input, output, session) {
       "Lands cycle lyso-PG"                 = c("LPG")
     )
   })
+  
+  
   
   
   # ---- Pathway scores (ratios/fractions) ----
@@ -6098,6 +6186,21 @@ server <- function(input, output, session) {
       dplyr::mutate(sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample))) %>%
       filter_blanks(exclude = input$exclude_blank_path, sample_col = "sample_norm", exact = FALSE) 
     df <- filter_iqc(df, include_iqc = FALSE, sample_col = "sample")
+    
+    # Respect the group selection from the Statistics tab
+    fn <- tryCatch(get_active_grouping(), error = function(e) NULL)
+    if (!is.null(fn)) {
+      grp_res <- tryCatch(fn(df$sample), error = function(e) NULL)
+      if (!is.null(grp_res)) {
+        df$group <- grp_res$group
+        sel_grps <- input$stats_selected_groups
+        if (!is.null(sel_grps) && length(sel_grps) > 0) {
+          df <- df %>% dplyr::filter(group %in% sel_grps)
+        }
+        df$group <- NULL  # remove temp column before summarise
+      }
+    }
+    
     measure_col <- pick_measure_col(input$path_value_type)
     
     class_tot <- df %>%
@@ -6128,6 +6231,20 @@ server <- function(input, output, session) {
       filter_iqc(include_iqc = FALSE, sample_col = "sample")
     
     measure_col <- pick_measure_col(input$path_value_type)
+    
+    # Respect the group selection from the Statistics tab
+    fn_grp <- tryCatch(get_active_grouping(), error = function(e) NULL)
+    if (!is.null(fn_grp)) {
+      grp_res <- tryCatch(fn_grp(df$sample), error = function(e) NULL)
+      if (!is.null(grp_res)) {
+        df$group <- grp_res$group
+        sel_grps <- input$stats_selected_groups
+        if (!is.null(sel_grps) && length(sel_grps) > 0) {
+          df <- df %>% dplyr::filter(group %in% sel_grps)
+        }
+        df$group <- NULL
+      }
+    }
     
     df_vals <- df %>%
       dplyr::transmute(sample, plot_class, `Metabolite name`, value = .data[[measure_col]])
@@ -6192,11 +6309,6 @@ server <- function(input, output, session) {
     else
       rep("Unassigned", length(samples))
     sample_map <- data.frame(sample = samples, group = grps_raw, stringsAsFactors = FALSE)
-    groups <- sort(unique(sample_map$group[nzchar(sample_map$group)]))
-    updateSelectizeInput(session, "path_group_select",
-                         choices = groups,
-                         selected = if (length(groups)) groups[1] else NULL)
-    
     # Score choices
     sc_names <- names(pathway_scores_defs())
     updateSelectizeInput(session, "path_scores_select",
@@ -6290,7 +6402,7 @@ server <- function(input, output, session) {
   
   output$pathHeatmap <- renderPlot({
     hd <- path_heatmap_data()
-    cols <- colorRampPalette(c("#2c7bb6", "#ffffbf", "#d7191c"))(101)
+    cols <- .heatmap_palette(input$path_hm_palette %||% "viridis")
     pheatmap::pheatmap(
       hd$mat, color = cols,
       cluster_rows = TRUE, cluster_cols = TRUE,
@@ -6316,177 +6428,313 @@ server <- function(input, output, session) {
     content  = function(file) readr::write_csv(path_scores_long(), file)
   )
   
-  # One-vs-rest t-tests on class totals to define "hits" per group (classes as features)
-  class_ovr_stats <- function(class_totals, sample_groups, padj_method = "BH") {
-    feats   <- sort(unique(class_totals$plot_class))
-    samples <- sort(unique(class_totals$sample))
-    
-    # ensure mapping sample -> group
-    stopifnot(all(samples %in% sample_groups$sample))
-    gvec <- setNames(sample_groups$group, sample_groups$sample)
-    
-    out <- lapply(unique(sample_groups$group), function(g) {
-      is_g <- gvec == g
-      rows <- lapply(feats, function(cl) {
-        x  <- class_totals %>% dplyr::filter(plot_class == cl)
-        xv <- x$value[match(names(is_g), x$sample)]  # align to sample order in is_g
-        # require both groups present
-        if (length(unique(is_g[!is.na(xv)])) < 2) return(NULL)
-        tt <- try(stats::t.test(xv ~ is_g), silent = TRUE)
-        if (inherits(tt, "try-error")) return(NULL)
-        m1 <- mean(xv[is_g], na.rm = TRUE); m0 <- mean(xv[!is_g], na.rm = TRUE)
-        data.frame(
-          class     = cl,
-          for_group = g,
-          p         = as.numeric(tt$p.value),
-          log2FC    = log2((m1 + 1e-12) / (m0 + 1e-12)),
-          stringsAsFactors = FALSE
-        )
-      })
-      dplyr::bind_rows(rows)
-    })
-    
-    res <- dplyr::bind_rows(out)
-    if (is.null(res) || nrow(res) == 0) return(NULL)
-    res <- res %>%
-      dplyr::group_by(for_group) %>%
-      dplyr::mutate(p_adj = p.adjust(p, method = if (identical(padj_method, "none")) "none" else padj_method)) %>%
-      dplyr::ungroup()
-    res
+  # ---- Synthesis Pathways plot export ----
+  .path_export_dims <- function() {
+    px_w  <- input$path_export_width    %||% 1400
+    px_h  <- input$path_export_height   %||% 900
+    dpi   <- input$path_export_dpi      %||% 300
+    scale <- input$path_export_scale    %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
   }
   
-  
-  path_ora_results <- reactive({
-    req(path_class_totals(), isTRUE(input$path_do_ora))
-    ct <- path_class_totals()
-    
-    sample_groups <- ct %>%
-      dplyr::distinct(sample) %>%
-      dplyr::mutate(group = {
-        fn  <- tryCatch(get_active_grouping(), error = function(e) NULL)
-        if (!is.null(fn))
-          tryCatch(fn(sample)$group, error = function(e) rep("Unassigned", length(sample)))
-        else
-          rep("Unassigned", length(sample))
-      })
-    
-    gtab <- sample_groups %>% dplyr::count(group, name = "n")
-    if (nrow(gtab) < 2) {
-      showNotification("Pathways ORA: need ≥2 groups; check grouping settings or CSV.", type = "error", duration = 8)
+  .build_path_plot <- function(which, fsz = 11) {
+    if (which == "scorestats") which <- "scorestats"  # explicit alias
+    if (which == "heatmap") {
+      hd <- path_heatmap_data()
+      if (is.null(hd)) return(NULL)
+      cols <- .heatmap_palette(input$path_hm_palette %||% "viridis")
+      pheatmap::pheatmap(
+        hd$mat, color = cols,
+        cluster_rows = TRUE, cluster_cols = TRUE,
+        border_color = NA,
+        show_rownames = TRUE, show_colnames = TRUE,
+        fontsize_row = fsz, fontsize_col = fsz + 1,
+        main = "Pathway scores (z-scored by row)",
+        silent = TRUE
+      )
+    } else {
+      # Score statistics lollipop — rebuild from path_score_stats
+      res <- path_score_stats()
+      if (is.null(res) || nrow(res) == 0) return(NULL)
+      alpha    <- input$path_alpha %||% 0.05
+      use_padj <- !identical(input$path_padj_method %||% "BH", "none")
+      p_col    <- if (use_padj) "p_adj" else "p"
+      x_label  <- if (use_padj) expression(-log[10](p[adj])) else expression(-log[10](p))
+      res <- res %>%
+        dplyr::mutate(
+          neg_log10_p = -log10(pmax(.data[[p_col]], 1e-300)),
+          sig         = .data[[p_col]] < alpha,
+          score_fct   = forcats::fct_reorder(score, neg_log10_p)
+        )
+      ggplot2::ggplot(res, ggplot2::aes(
+        x = neg_log10_p, y = score_fct, colour = direction, fill = direction
+      )) +
+        ggplot2::geom_segment(
+          ggplot2::aes(x = 0, xend = neg_log10_p, yend = score_fct),
+          linewidth = 0.7, alpha = 0.5
+        ) +
+        ggplot2::geom_point(ggplot2::aes(shape = sig), size = 3.5) +
+        ggplot2::scale_shape_manual(
+          values = c("TRUE" = 19, "FALSE" = 1),
+          labels = c("TRUE" = paste0("p < ", alpha), "FALSE" = "NS"),
+          name   = "Significance"
+        ) +
+        ggplot2::geom_vline(xintercept = -log10(alpha), linetype = "dashed", colour = "grey50") +
+        ggplot2::labs(x = x_label, y = NULL, colour = "Higher in", fill = "Higher in",
+                      title = "Pathway score group comparisons") +
+        ggplot2::theme_minimal(base_size = fsz) +
+        ggplot2::theme(panel.grid.major.y = ggplot2::element_blank(), legend.position = "right")
     }
+  }
+  
+  output$download_path_png <- downloadHandler(
+    filename = function() {
+      sel <- isolate(input$path_export_plot_sel %||% "heatmap")
+      paste0("pathway_", sel, "_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      dims <- isolate(.path_export_dims())
+      fsz  <- isolate(input$path_export_fontsize %||% 11)
+      sel  <- isolate(input$path_export_plot_sel %||% "heatmap")
+      obj  <- isolate(.build_path_plot(sel, fsz))
+      validate(need(!is.null(obj), "No plot to export."))
+      if (inherits(obj, "pheatmap") || inherits(obj, "list")) {
+        grDevices::png(file,
+                       width  = round(dims$w * dims$dpi),
+                       height = round(dims$h * dims$dpi),
+                       res    = dims$dpi)
+        on.exit(grDevices::dev.off(), add = TRUE)
+        grid::grid.newpage()
+        grid::grid.draw(obj$gtable)
+      } else {
+        ggplot2::ggsave(file, plot = obj,
+                        width = dims$w, height = dims$h,
+                        dpi = dims$dpi, device = "png")
+      }
+    }
+  )
+  
+  output$download_path_svg <- downloadHandler(
+    filename = function() {
+      sel <- isolate(input$path_export_plot_sel %||% "heatmap")
+      paste0("pathway_", sel, "_", Sys.Date(), ".svg")
+    },
+    content = function(file) {
+      dims <- isolate(.path_export_dims())
+      fsz  <- isolate(input$path_export_fontsize %||% 11)
+      sel  <- isolate(input$path_export_plot_sel %||% "heatmap")
+      obj  <- isolate(.build_path_plot(sel, fsz))
+      validate(need(!is.null(obj), "No plot to export."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      if (inherits(obj, "pheatmap") || inherits(obj, "list")) {
+        grid::grid.newpage()
+        grid::grid.draw(obj$gtable)
+      } else {
+        print(obj)
+      }
+    }
+  )
+  
+  # One-vs-rest t-tests on class totals to define "hits" per group (classes as features)
+  # ========== SYNTHESIS PATHWAYS — SCORE STATISTICS (Option D) ==========
+  
+  # Reactive: run t-test / one-way ANOVA on each score's sample values
+  path_score_stats <- reactive({
+    req(path_scores_long())
+    sc   <- path_scores_long()
+    sel  <- input$path_scores_select
+    if (!is.null(sel) && length(sel) > 0) sc <- sc %>% dplyr::filter(score %in% sel)
     
-    # per-group class one-vs-rest stats
-    stats <- class_ovr_stats(ct, sample_groups, padj_method = input$path_padj_method)
-    if (is.null(stats) || nrow(stats) == 0) {
-      showNotification("Pathways ORA: no class-level one-vs-rest results. Try changing alpha/Padj or grouping.", type = "warning", duration = 8)
+    # Drop samples with no group assignment
+    sc <- sc %>% dplyr::filter(!is.na(group) & nzchar(group) & group != "Unassigned")
+    
+    grps <- unique(sc$group)
+    if (length(grps) < 2) {
+      showNotification(
+        "Score statistics: need ≥2 groups. Check Group Preview tab.",
+        type = "warning", duration = 6
+      )
       return(NULL)
     }
     
+    padj_method  <- input$path_padj_method  %||% "BH"
+    equal_var    <- isTRUE(input$path_stats_equal_var)
+    n_grps       <- length(grps)
     
-    sets <- pathway_sets_static()
-    univ <- sort(unique(ct$plot_class))
-    gsel <- input$path_group_select
-    if (length(gsel) == 0) gsel <- unique(sample_groups$group)
-    
-    
-    out <- lapply(gsel, function(g) {
-      gg <- stats %>% dplyr::filter(for_group == g)
-      alpha <- input$path_alpha %||% 0.05
-      use_p <- if (!identical(input$path_padj_method, "none")) "p_adj" else "p"
-      sel   <- gg[[use_p]] < alpha
+    rows <- lapply(unique(sc$score), function(s) {
+      df_s <- sc %>%
+        dplyr::filter(score == s) %>%
+        dplyr::filter(!is.na(value))
       
-      direction <- input$path_ora_direction %||% "up"
-      hits <- switch(direction,
-                     "up"   = gg$class[ sel & gg$log2FC > 0 ],
-                     "down" = gg$class[ sel & gg$log2FC < 0 ],
-                     "both" = gg$class[ sel ],
-                     gg$class[ sel ]
-      )
+      # Need ≥2 groups with ≥1 observation each
+      grp_counts <- table(df_s$group)
+      valid_grps <- names(grp_counts[grp_counts >= 1])
+      if (length(valid_grps) < 2) return(NULL)
       
+      df_s <- df_s %>% dplyr::filter(group %in% valid_grps)
+      groups_present <- sort(unique(df_s$group))
       
-      if (length(hits) == 0) {
-        showNotification(paste0("Pathways ORA: no class hits for group '", g,
-                                "'. Try 'Either' direction or relax alpha/p-adj."),
-                         type = "message", duration = 6)
-        return(NULL)
+      # Group means for direction / fold-change
+      means <- df_s %>%
+        dplyr::group_by(group) %>%
+        dplyr::summarise(mean = mean(value, na.rm = TRUE), .groups = "drop")
+      
+      if (length(groups_present) == 2) {
+        # t-test
+        g1 <- df_s$value[df_s$group == groups_present[1]]
+        g2 <- df_s$value[df_s$group == groups_present[2]]
+        tt <- tryCatch(
+          stats::t.test(g1, g2, var.equal = equal_var),
+          error = function(e) NULL
+        )
+        if (is.null(tt)) return(NULL)
+        m1 <- mean(g1, na.rm = TRUE)
+        m2 <- mean(g2, na.rm = TRUE)
+        log2fc <- log2((m1 + 1e-12) / (m2 + 1e-12))
+        data.frame(
+          score      = s,
+          test       = "t-test",
+          groups     = paste(groups_present, collapse = " vs "),
+          statistic  = round(as.numeric(tt$statistic), 3),
+          log2FC     = round(log2fc, 3),
+          direction  = if (log2fc > 0) groups_present[1] else groups_present[2],
+          p          = as.numeric(tt$p.value),
+          stringsAsFactors = FALSE
+        )
+      } else {
+        # one-way ANOVA
+        fit <- tryCatch(
+          stats::aov(value ~ group, data = df_s),
+          error = function(e) NULL
+        )
+        if (is.null(fit)) return(NULL)
+        sm  <- summary(fit)[[1]]
+        Fval <- sm[["F value"]][1]
+        pval <- sm[["Pr(>F)"]][1]
+        if (is.na(pval)) return(NULL)
+        # Direction = group with highest mean
+        top_grp <- means$group[which.max(means$mean)]
+        data.frame(
+          score      = s,
+          test       = "one-way ANOVA",
+          groups     = paste(groups_present, collapse = " / "),
+          statistic  = round(Fval, 3),
+          log2FC     = NA_real_,
+          direction  = top_grp,
+          p          = as.numeric(pval),
+          stringsAsFactors = FALSE
+        )
       }
-      
-      resg <- try(run_ora(hits, univ, sets), silent = TRUE)
-      if (inherits(resg, "try-error") || is.null(resg) || nrow(resg) == 0) {
-        return(NULL)
-      }
-      
-      if (isTRUE(input$path_ora_only_overlap)) {
-        resg <- subset(resg, k > 0)
-        if (nrow(resg) == 0) return(NULL)
-      }
-      
-      if (!"label" %in% names(resg)) resg$label <- resg$set
-      resg$for_group <- g
-      resg
     })
     
-    res <- dplyr::bind_rows(out)
-    if (is.null(res) || nrow(res) == 0) {
-      showNotification("Pathways ORA: no enrichment detected for selected group(s).", type = "warning", duration = 6)
-      return(NULL)
-    }
-    res
+    out <- dplyr::bind_rows(rows)
+    if (is.null(out) || nrow(out) == 0) return(NULL)
+    
+    # BH correction across all scores
+    out$p_adj <- p.adjust(out$p, method = if (identical(padj_method, "none")) "none" else padj_method)
+    out <- out %>% dplyr::arrange(p_adj, p)
+    out
   })
   
-  
-  output$pathOraPlot <- renderPlot({
-    req(path_ora_results())
-    res <- path_ora_results()
-    topn <- 30
-    top <- res %>%
-      dplyr::group_by(for_group) %>%
-      dplyr::slice_head(n = topn) %>%
-      dplyr::ungroup()
+  # Plot: horizontal lollipop of -log10(p_adj), coloured by direction
+  output$pathStatsPlot <- renderPlot({
+    res <- path_score_stats()
+    validate(need(!is.null(res) && nrow(res) > 0,
+                  "No score statistics yet. Check grouping in Group Preview tab."))
     
-    use_padj <- !identical(input$path_padj_method, "none")
-    top <- top %>%
-      dplyr::mutate(xval = if (use_padj) -log10(pmax(p_adj, 1e-300)) else -log10(pmax(p, 1e-300)))
+    alpha    <- input$path_alpha %||% 0.05
+    use_padj <- !identical(input$path_padj_method %||% "BH", "none")
+    p_col    <- if (use_padj) "p_adj" else "p"
+    x_label  <- if (use_padj) expression(-log[10](p[adj])) else expression(-log[10](p))
     
-    gg <- ggplot2::ggplot(
-      top,
-      ggplot2::aes(x = xval, y = reorder(label, xval), size = m, color = -log10(p))
-    ) +
-      ggplot2::geom_point() +
-      ggplot2::labs(
-        x = if (use_padj) "-log10(adj p)" else "-log10(p)",
-        y = "Pathway set",
-        size = "Set size",
-        color = "-log10(p)"
+    res <- res %>%
+      dplyr::mutate(
+        neg_log10_p = -log10(pmax(.data[[p_col]], 1e-300)),
+        sig         = .data[[p_col]] < alpha,
+        score_fct   = forcats::fct_reorder(score, neg_log10_p)
+      )
+    
+    direction_colours <- setNames(
+      scales::hue_pal()(length(unique(res$direction))),
+      unique(res$direction)
+    )
+    
+    ggplot2::ggplot(res, ggplot2::aes(
+      x     = neg_log10_p,
+      y     = score_fct,
+      colour = direction,
+      fill   = direction
+    )) +
+      ggplot2::geom_segment(
+        ggplot2::aes(x = 0, xend = neg_log10_p, yend = score_fct),
+        linewidth = 0.7, alpha = 0.5
       ) +
-      ggplot2::theme_minimal(base_size = 12)
-    
-    if (length(unique(na.omit(top$for_group))) > 1) {
-      gg <- gg + ggplot2::facet_wrap(~for_group, scales = "free_y", ncol = 1)
-    }
-    gg
+      ggplot2::geom_point(
+        ggplot2::aes(shape = sig),
+        size = 3.5
+      ) +
+      ggplot2::scale_shape_manual(
+        values = c("TRUE" = 19, "FALSE" = 1),
+        labels = c("TRUE" = paste0("p < ", alpha), "FALSE" = "NS"),
+        name   = "Significance"
+      ) +
+      ggplot2::geom_vline(
+        xintercept = -log10(alpha),
+        linetype   = "dashed",
+        colour     = "grey50"
+      ) +
+      ggplot2::labs(
+        x      = x_label,
+        y      = NULL,
+        colour = "Higher in",
+        fill   = "Higher in",
+        title  = "Pathway score group comparisons"
+      ) +
+      ggplot2::theme_minimal(base_size = 12) +
+      ggplot2::theme(
+        panel.grid.major.y = ggplot2::element_blank(),
+        legend.position    = "right"
+      )
   })
   
-  
-  output$pathOraTable <- DT::renderDT({
-    req(path_ora_results())
-    res <- path_ora_results()
-    res$neglog10_p     <- -log10(pmax(res$p, 1e-300))
-    res$neglog10_p_adj <- -log10(pmax(res$p_adj, 1e-300))
-    keep <- res[, c("for_group","set","k","K","m","n","p","p_adj","neglog10_p","neglog10_p_adj"), drop = FALSE]
-    colnames(keep) <- c("Group","Set","k (hits in set)","K (hits total)","m (set size)","n (bg rest)",
-                        "p","p_adj","-log10(p)","-log10(p_adj)")
-    DT::datatable(keep, options = list(scrollX = TRUE), rownames = FALSE)
+  # Table: clean formatted results
+  output$pathStatsTable <- DT::renderDT({
+    res <- path_score_stats()
+    validate(need(!is.null(res) && nrow(res) > 0, "No results yet."))
+    alpha    <- input$path_alpha %||% 0.05
+    use_padj <- !identical(input$path_padj_method %||% "BH", "none")
+    display  <- res %>%
+      dplyr::mutate(
+        p      = signif(p,     3),
+        p_adj  = signif(p_adj, 3),
+        log2FC = ifelse(is.na(log2FC), "—", as.character(round(log2FC, 2)))
+      ) %>%
+      dplyr::select(score, test, groups, statistic, log2FC, direction, p, p_adj)
+    colnames(display) <- c("Score", "Test", "Groups", "Statistic", "log2FC", "Higher in", "p", "p_adj")
+    DT::datatable(
+      display,
+      rownames = FALSE,
+      options  = list(scrollX = TRUE, pageLength = 20),
+      class    = "stripe hover compact"
+    ) %>%
+      DT::formatStyle(
+        "p_adj",
+        backgroundColor = DT::styleInterval(
+          alpha,
+          c("#d4edda", "white")
+        )
+      )
   })
-  
   
   # ========== VOLCANO PLOT ==========
-  output$volcanoPlot <- renderPlotly({
-    res <- stats_results_val()
-    validate(need(!is.null(res) && nrow(res) > 0,
-                  "Run statistics first (click Run statistics button)."))
-    validate(need("log2FC" %in% names(res),
-                  "Volcano plot requires a t-test result with log2FC column."))
+  # ========== VOLCANO PLOT ==========
+  # Shared ggplot reactive — used by both renderPlotly (screen) and download handlers
+  volcano_ggplot <- reactive({
+    res <- stats_results_all()  # always use full unfiltered results
+    if (is.null(res) || nrow(res) == 0 || !"log2FC" %in% names(res)) return(NULL)
     alpha  <- input$volcano_alpha  %||% 0.05
     fc_thr <- input$volcano_log2fc %||% 1
     p_col  <- if (isTRUE(input$volcano_use_padj) &&
@@ -6540,113 +6788,116 @@ server <- function(input, output, session) {
         )
       }
     }
+    p
+  })
+  
+  output$volcanoPlot <- renderPlotly({
+    p <- volcano_ggplot()
+    validate(need(!is.null(p), "Run statistics first (click Run statistics button)."))
     plotly::ggplotly(p, tooltip = "text")
   })
   
-  output$download_volcano <- downloadHandler(
-    filename = function() {
-      paste0("volcano_", input$stats_class, "_", Sys.Date(), ".png")
-    },
+  
+  .volc_export_dims <- function() {
+    px_w  <- input$volc_export_width  %||% 1200
+    px_h  <- input$volc_export_height %||% 700
+    dpi   <- input$volc_export_dpi    %||% 300
+    scale <- input$volc_export_scale  %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+  
+  output$download_volcano_png <- downloadHandler(
+    filename = function() paste0("volcano_", isolate(input$stats_class), "_", Sys.Date(), ".png"),
     content = function(file) {
-      res <- stats_results_val()
-      req(!is.null(res) && nrow(res) > 0 && "log2FC" %in% names(res))
-      alpha  <- input$volcano_alpha  %||% 0.05
-      fc_thr <- input$volcano_log2fc %||% 1
-      p_col  <- if (isTRUE(input$volcano_use_padj) &&
-                    "p_adj" %in% names(res)) "p_adj" else "p"
-      res <- res %>%
-        dplyr::mutate(
-          neg_log10_p = -log10(pmax(.data[[p_col]], 1e-300)),
-          direction   = dplyr::case_when(
-            .data[[p_col]] < alpha & log2FC >  fc_thr ~ "Up",
-            .data[[p_col]] < alpha & log2FC < -fc_thr ~ "Down",
-            TRUE ~ "NS"
-          )
-        )
-      p <- ggplot2::ggplot(
-        res,
-        ggplot2::aes(x = log2FC, y = neg_log10_p, colour = direction)
-      ) +
-        ggplot2::geom_point(alpha = 0.7, size = 1.8) +
-        ggplot2::geom_vline(xintercept = c(-fc_thr, fc_thr),
-                            linetype = "dashed", colour = "#888888") +
-        ggplot2::geom_hline(yintercept = -log10(alpha),
-                            linetype = "dashed", colour = "#888888") +
-        ggplot2::scale_colour_manual(
-          values = c(Up = "#E45756", Down = "#4C78A8", NS = "#AAAAAA")
-        ) +
-        ggplot2::labs(
-          x = "log2 Fold Change",
-          y = paste0("-log10(", p_col, ")"),
-          colour = "Direction"
-        ) +
-        ggplot2::theme_minimal(base_size = 12)
+      dims <- isolate(.volc_export_dims())
+      p    <- isolate(volcano_ggplot())
+      validate(need(!is.null(p), "No plot to export. Run statistics first."))
       ggplot2::ggsave(file, plot = p,
-                      width = 8, height = 6, dpi = 300, device = "png")
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
     }
   )
   
-  # ========== LONG-FORMAT EXPORT ==========
-  export_long_data <- reactive({
-    req(bg_norm_long_resolved())
-    df <- bg_norm_long_resolved() %>%
-      dplyr::filter(
-        !stringr::str_detect(`Metabolite name`, "\\[IS\\]")
-      ) %>%
-      dplyr::mutate(
-        sample_norm = dplyr::coalesce(sample_norm,
-                                      normalize_sample_name(sample))
-      )
-    df <- filter_blanks(df, input$exclude_blank_export,
-                        sample_col = "sample_norm", exact = FALSE)
-    df <- filter_iqc(df, include_iqc = FALSE, sample_col = "sample")
-    classes <- input$export_classes
-    if (!is.null(classes) && length(classes) > 0) {
-      df <- df %>% dplyr::filter(plot_class %in% classes)
+  output$download_volcano_svg <- downloadHandler(
+    filename = function() paste0("volcano_", isolate(input$stats_class), "_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.volc_export_dims())
+      p    <- isolate(volcano_ggplot())
+      validate(need(!is.null(p), "No plot to export. Run statistics first."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
     }
-    measure_col <- pick_measure_col(input$export_value_type)
-    if (identical(input$export_display_mode, "percent")) {
-      totals <- df %>%
-        dplyr::group_by(sample, plot_class) %>%
-        dplyr::summarise(
-          class_total = sum(.data[[measure_col]], na.rm = TRUE),
-          .groups = "drop"
-        )
-      df <- df %>%
-        dplyr::left_join(totals, by = c("sample", "plot_class")) %>%
-        dplyr::mutate(
-          value_export = dplyr::if_else(
-            class_total > 0,
-            100 * .data[[measure_col]] / class_total,
-            NA_real_
-          )
-        ) %>%
-        dplyr::select(-class_total)
-    } else {
-      df <- df %>%
-        dplyr::mutate(value_export = .data[[measure_col]])
-    }
-    fn  <- get_active_grouping()
-    res <- fn(df$sample)
-    df  <- df %>% dplyr::mutate(group = res$group)
-    df %>%
-      dplyr::select(dplyr::any_of(c(
-        "plot_class", "Metabolite name", "Average Rt(min)",
-        "Average Mz", "Adduct type", "ion.mode",
-        "sample", "group", "value_export", "norm_units"
-      ))) %>%
-      dplyr::arrange(plot_class, `Metabolite name`, sample)
-  })
+  )
   
-  output$download_export_long <- downloadHandler(
+  # ---- Statistics plot export helpers ----
+  # Shared helper: build dimensions from the new MetaboRich-style inputs
+  .stats_export_dims <- function() {
+    px_w  <- input$stats_export_width    %||% 1200
+    px_h  <- input$stats_export_height   %||% 700
+    dpi   <- input$stats_export_dpi      %||% 300
+    scale <- input$stats_export_scale    %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+  
+  # Helper: rebuild the currently displayed single-feature stats plot
+  .current_stats_plot <- function() {
+    res <- stats_results_val()
+    if (is.null(res) || nrow(res) == 0) return(NULL)
+    idx <- max(1, min(isolate(current_plot_index()), nrow(res)))
+    met <- res$metabolite[idx]
+    tryCatch(
+      .build_stats_barplot(
+        met             = met,
+        idx             = idx,
+        n_total         = nrow(res),
+        df_long         = stats_input_long(),
+        res_all         = res,
+        err_type        = input$stats_error_type %||% "SEM",
+        show_pts        = isTRUE(input$stats_plot_points),
+        show_two_way    = any(res$test == "twoway"),
+        alpha           = input$alpha %||% 0.05,
+        padj_method     = input$padj_method %||% "BH",
+        use_adj         = isTRUE(input$use_adj_threshold),
+        posthoc_choices = input$posthoc %||% character(0),
+        base_size       = isolate(input$stats_export_fontsize %||% 14)
+      ),
+      error = function(e) NULL
+    )
+  }
+  
+  # PNG export of the currently displayed single-feature plot
+  output$download_stats_png <- downloadHandler(
     filename = function() {
-      mode <- if (identical(input$export_display_mode, "percent"))
-        "percent" else "absolute"
-      kind <- if (identical(input$export_value_type, "value_bs"))
-        "bgsub" else "quant"
-      paste0("export_long_", kind, "_", mode, "_", Sys.Date(), ".csv")
+      paste0("LipiRich_stats_", isolate(input$stats_class), "_", Sys.Date(), ".png")
     },
-    content = function(file) readr::write_csv(export_long_data(), file)
+    content = function(file) {
+      dims <- isolate(.stats_export_dims())
+      p    <- isolate(.current_stats_plot())
+      validate(need(!is.null(p), "No plot to export. Run statistics first."))
+      ggplot2::ggsave(file, plot = p,
+                      width  = dims$w, height = dims$h,
+                      dpi    = dims$dpi, device = "png")
+    }
+  )
+  
+  # SVG export of the currently displayed single-feature plot
+  output$download_stats_svg <- downloadHandler(
+    filename = function() {
+      paste0("LipiRich_stats_", isolate(input$stats_class), "_", Sys.Date(), ".svg")
+    },
+    content = function(file) {
+      dims <- isolate(.stats_export_dims())
+      p    <- isolate(.current_stats_plot())
+      validate(need(!is.null(p), "No plot to export. Run statistics first."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
+    }
   )
   
   # ---- Statistics PDF export — one significant plot per page ----
@@ -6660,11 +6911,16 @@ server <- function(input, output, session) {
       validate(need(!is.null(res) && nrow(res) > 0,
                     "No significant results to export. Run statistics first."))
       
-      pw        <- isolate(input$stats_pdf_width  %||% 7)
-      ph        <- isolate(input$stats_pdf_height %||% 5)
-      dpi       <- as.integer(isolate(input$stats_pdf_dpi %||% "300"))
+      px_w      <- isolate(input$stats_export_width    %||% 1200)
+      px_h      <- isolate(input$stats_export_height   %||% 700)
+      dpi       <- isolate(input$stats_export_dpi      %||% 300)
+      scale     <- isolate(input$stats_export_scale    %||% 1.0)
+      base_sz   <- isolate(input$stats_export_fontsize %||% 14)
       layout    <- isolate(input$stats_pdf_scale %||% "single")
       per_page  <- switch(layout, single = 1L, two = 2L, four = 4L, 1L)
+      # Convert px → inches for grDevices::pdf(), apply scale fraction
+      pw        <- (px_w / dpi) * scale
+      ph        <- (px_h / dpi) * scale
       err_type  <- isolate(input$stats_error_type %||% "SEM")
       show_pts  <- isTRUE(isolate(input$stats_plot_points))
       show_two_way <- any(res$test == "twoway")
@@ -6721,7 +6977,7 @@ server <- function(input, output, session) {
               padj_method   = padj_meth,
               use_adj       = use_adj,
               posthoc_choices = phoc,
-              base_size     = if (per_page == 1L) 14 else 11
+              base_size     = if (per_page == 1L) base_sz else max(6L, base_sz - 3L)
             ),
             error = function(e) NULL
           )
@@ -6741,23 +6997,16 @@ server <- function(input, output, session) {
   
   # ========== LIPID NETWORK TAB ==========
   
-  # Populate group selector whenever data is available
-  observeEvent(bg_norm_long_resolved(), {
-    req(bg_norm_long_resolved())
-    df <- bg_norm_long_resolved() %>%
-      dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
-      dplyr::mutate(sample_norm = dplyr::coalesce(sample_norm,
-                                                  normalize_sample_name(sample)))
-    df <- filter_blanks(df, isTRUE(input$net_exclude_blank),
-                        sample_col = "sample_norm", exact = FALSE)
-    df <- filter_iqc(df, include_iqc = FALSE, sample_col = "sample")
-    fn   <- get_active_grouping()
-    res  <- fn(df$sample)
-    grps <- sort(unique(na.omit(res$group[nzchar(res$group)])))
+  # Populate network group selector from the same central reactiveVal as PCA/Stats
+  observe({
+    grps <- net_available_groups()
+    cur  <- isolate(input$net_group)
     updateSelectInput(session, "net_group",
-                      choices = grps,
-                      selected = if (length(grps) > 0) grps[1] else NULL)
-  }, ignoreInit = FALSE)
+                      choices  = grps,
+                      selected = if (!is.null(cur) && cur %in% grps) cur
+                      else if (length(grps) > 0) grps[1]
+                      else NULL)
+  })
   
   # Store edge list for download
   net_edge_data <- reactiveVal(NULL)
