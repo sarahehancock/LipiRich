@@ -4,6 +4,81 @@
 
 ---
 
+## [0.0.3] — 2026-06-06
+
+### New features
+
+#### Class Bar Plots tab (new, Step 9 — between Volcano Plot and Heatmap)
+A dedicated tab for visualising all lipid species within a selected class as a single grouped bar plot with dodged bars per group. Features include:
+
+- **Class selector** — populated from the loaded data as soon as data is uploaded; shows all detected lipid classes.
+- **Value type** — IS-normalised or background-subtracted; units selector for y-axis label.
+- **Abundance range filter** — percentage slider filters species by mean abundance relative to the class maximum, enabling focus on high-, mid-, or low-abundance species independently.
+- **Significant species only toggle** — now correctly uses `stats_results_all` (all tested features) so the checkbox meaningfully restricts to species that passed the significance threshold, rather than the pre-filtered result set.
+- **Significance brackets** — pairwise comparisons drawn as annotated bracket segments directly on the plot. For t-test (2 groups): a single bracket spanning the two bars. For ANOVA (≥3 groups): one stacked bracket per significant Tukey HSD pairwise comparison. Brackets show `*`, `**`, or `***` symbols.
+- **Point overlay** — individual data points dodged to align with their group bar; user-configurable fill (match palette / black / white) and outline (white / black / none).
+- **Colour palettes** — 18 options across qualitative (Okabe-Ito default, Dark2, Set1, Set2, Paired, Accent, Tableau 10), sequential (Viridis, Plasma, Inferno, Blues, Greens, Purples), and diverging (RdBu, PuOr, BrBG) schemes.
+- **Bar opacity** and **point size** numeric controls.
+- **Species ordering** — alphabetical (default) or by descending mean abundance.
+- **PNG and SVG export** with the standard Width/Height/DPI/Scale/Font size controls.
+
+#### Shared pairwise comparison helper `.compute_pairwise`
+Extracted a shared internal function used by both the Statistics tab bar plots (`posthoc_for_plot`) and the Class Bar Plots tab (`cbp_data`). Eliminates code duplication, ensures consistent pairwise test logic (Welch t-test for 2 groups; Tukey HSD for ≥3 groups via rstatix with base R fallback), and guarantees the Class Bar Plots tab always shows brackets regardless of what posthoc settings are active on the Statistics tab.
+
+#### Heatmap — t-test (2-group) data enabled
+Column clustering is now automatically disabled when the heatmap matrix has fewer than 3 columns (i.e. t-test / 2-group results), preventing a pheatmap clustering error. A note is displayed in the heatmap panel when this applies.
+
+#### Volcano plot — label repulsion
+Significant feature labels on the volcano plot now use `ggrepel::geom_text_repel` instead of `ggplot2::geom_text`, automatically repositioning overlapping labels with connector lines. `coord_cartesian(clip = "off")` ensures labels pushed outside the panel boundary are not clipped.
+
+#### Colour palette options — heatmap tabs
+Both the Heatmap and Synthesis Pathways → Scores heatmap tabs now include a Colour palette dropdown with 10 options: Viridis (default), Magma, Plasma, Inferno, Cividis, Rocket, Mako, Turbo, Blue–White–Red (diverging), Green–White–Purple (diverging).
+
+#### Row/column label toggles — Heatmap tab
+Two checkboxes — **Show row labels** and **Show column labels** — allow labels to be independently hidden.
+
+---
+
+### Bug fixes
+
+#### Synthesis Pathways — TAG storage score corrected
+The "TAG storage" score was computing DAG/TG (DAG in numerator). Corrected to TG/DAG (TG in numerator) — a higher score now correctly reflects greater TAG storage relative to the DAG precursor pool. The score name is updated to `TAG storage (TG/DAG)`.
+
+#### Downstream tabs respect Statistics group selection
+The Enrichment (`enrich_base_df`) and Synthesis Pathways (`path_totals_extended`) tabs now correctly filter to only the groups selected on the Statistics tab, matching the behaviour of the Statistics bar plots, heatmap, and volcano.
+
+#### Correlation Network group dropdown
+Wired into the same central `net_available_groups` reactiveVal pattern used by PCA and Statistics, and restricted to groups included in the current statistics run. Resolves a race condition where the dropdown populated before group tokens were configured.
+
+#### Volcano plot — all features shown
+The volcano plot previously only showed features that passed the significance filter. Now reads from `stats_results_all` (always full unfiltered results), so all tested features appear regardless of the Statistics tab's significance filter setting.
+
+#### Volcano plot — PNG/SVG export producing HTML files
+Export handlers were calling a stale `volcano_plot_obj()` reactive that returned a plotly object. Fixed by extracting a `volcano_ggplot` reactive (pure ggplot2) used by both the interactive display and download handlers.
+
+#### Statistics tab group tokens not inherited by downstream tabs
+Synthesis Pathways and Correlation Network tabs now correctly reflect the active token selection from the Group Preview tab. The Synthesis Pathways dead parallel grouping UI (method selector, delimiter, token inputs) has been removed.
+
+#### sigHeatmapInfo dangling output
+Fixed a textOutput in the Heatmap tab that had no corresponding server render.
+
+---
+
+### Improvements
+
+#### Tab renamed: "Lipid Network" → "Correlation Network"
+Clarifies that the network reflects Pearson correlation, not metabolic pathway connectivity.
+
+#### Landing page step numbering updated
+Step 9 is now Class Bar Plots; previous steps 9–11 renumbered to 10–12.
+
+#### Plot export controls standardised
+All visualisation tabs (Statistics bar plots, Volcano, Heatmap, Enrichment, Synthesis Pathways, Class Bar Plots) now use consistent Width (px) / Height (px) / DPI / Scale fraction / Base font size controls with PNG + SVG buttons.
+
+---
+
+---
+
 ## [0.0.2] — 2026-06-03
 
 ### Summary

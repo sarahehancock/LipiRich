@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.0.2-blue" alt="v0.0.2"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.0.3-blue" alt="v0.0.3"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.5.2, and Bioconductor 3.22.
 
-> ⚠️ **Pre-publication software (v0.0.2):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.0.3):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -20,6 +20,7 @@
 | **Export** | Wide and long-format CSV export with class and unit filtering |
 | **PCA** | Principal component analysis with token-based group colouring and sample selection |
 | **Statistics** | Auto t-test / one-way ANOVA / two-way ANOVA with post-hoc tests, volcano plot, and significance heatmap |
+| **Class Bar Plots** | Faceted bar plots of all species within a selected lipid class post-statistics, with abundance range filtering and significance highlighting |
 | **Enrichment** | ORA and FGSEA across lipid class, fatty acid identity, saturation, chain length, and ether subclass sets |
 | **Correlation Network** | Pearson correlation network of significant lipid species within a selected group |
 | **Synthesis Pathways** | Curated enzyme activity proxy scores with group comparison statistics |
@@ -200,11 +201,35 @@ Multiple testing correction (FDR/BH, Bonferroni, or none) and significance thres
 
 ### Volcano plot
 
-The volcano plot displays **all tested features** regardless of the significance filter applied to the bar plots and table. Points are coloured by direction (up/down/NS) according to the configured log2FC and p-value thresholds. The plot is interactive (hover for feature details) and can be exported as PNG or SVG.
+The volcano plot displays **all tested features** regardless of the significance filter applied to the bar plots and table. Points are coloured by direction (up/down/NS) according to the configured log2FC and p-value thresholds. Significant feature labels are automatically repelled to avoid overlap, with connector lines back to their points. The plot is interactive (hover for feature details) and can be exported as PNG or SVG.
 
 ### Significance heatmap
 
-Displays the top N significant features as a z-scored heatmap. Row and column clustering, label visibility, and colour palette (10 options including diverging schemes) are all configurable. Exported as PNG or SVG with user-specified pixel dimensions and DPI.
+Displays the top N significant features as a z-scored heatmap. Row and column clustering, row/column label visibility, and colour palette (10 options including diverging schemes) are all configurable. Column clustering is automatically disabled for 2-group (t-test) results. Exported as PNG or SVG with user-specified pixel dimensions and DPI.
+
+---
+
+## Class Bar Plots
+
+The Class Bar Plots tab displays all lipid species within a selected class as a **single grouped bar plot** with one colour per group, using the data and group assignments from the most recent statistics run. All groups selected on the Statistics tab are shown.
+
+### Controls
+
+**Data** — select a lipid class (populated immediately on data load), the value type (IS-normalised or background-subtracted), and the units for the y-axis label.
+
+**Filtering:**
+- **Show significant species only** — restricts the plot to species that passed the significance threshold. Reads from the full set of tested features so this toggle is always meaningful.
+- **Abundance range filter** — a percentage slider that filters species by mean abundance relative to the most abundant species in the class. For example, 10–100% removes low-abundance species; 0–10% shows only minor species.
+
+**Appearance:**
+- **Colour palette** — 18 options across qualitative (Okabe-Ito default, Tableau 10, Dark2, Set1, Set2, Paired, Accent), sequential (Viridis, Plasma, Inferno, Blues, Greens, Purples), and diverging (RdBu, PuOr, BrBG) schemes.
+- **Bar opacity** and **point size** — numeric controls.
+- **Point fill** — match palette colour, black, or white.
+- **Point outline** — white, black, or none.
+- **Error bars** — SEM, SD, or 95% CI.
+- **Species ordering** — alphabetical (default) or by descending mean abundance.
+
+**Significance brackets** — drawn automatically on the plot using the same pairwise test logic as the Statistics tab bar plots. For t-test (2 groups): a single bracket spanning both bars. For ANOVA (≥3 groups): one stacked bracket per significant Tukey HSD pairwise comparison. Symbols follow the standard convention (`*` p < 0.05, `**` p < 0.01, `***` p < 0.001).
 
 ---
 
@@ -282,7 +307,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2025). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.0.2). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2025). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.0.3). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 

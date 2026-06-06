@@ -1,18 +1,46 @@
 # app.R
 # --------------------------
-# LipiRich v0.0.2
+# LipiRich v0.0.3
+# Copyright (C) 2025 Sarah E. Hancock
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public
+# License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 # --------------------------
 # A Shiny application for normalisation, statistics, and visualisation
 # of MS-DIAL lipidomics alignment output data.
 #
 # Author:   Hancock, SE.
 # GitHub:   https://github.com/sarahehancock/LipiRich
-# License:  MIT
+# License:  GNU Affero General Public License v3.0 (AGPL-3.0)
+#
+# LipiRich — Copyright (C) 2025 Sarah E. Hancock
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
 # Version:  0.0.11
 # Tested with: MS-DIAL 5.5.251021, R 4.5.2, Bioconductor 3.22
 # --------------------------
 
-APP_VERSION <- "0.0.2"
+APP_VERSION <- "0.0.3"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -429,8 +457,8 @@ landing_page_ui <- function() {
             )
           ),
           tags$img(
-            src = "https://img.shields.io/badge/license-MIT-green",
-            alt = "MIT License",
+            src = "https://img.shields.io/badge/license-AGPL--3.0-blue",
+            alt = "AGPL-3.0 License",
             style = "height:20px;"
           ),
           tags$img(
@@ -507,20 +535,25 @@ landing_page_ui <- function() {
           div(class = "workflow-card",
               div(class = "step-num", "Step 8"),
               div(class = "step-title", "Statistics"),
-              div(class = "step-desc", "Unpaired t-test, one-way ANOVA, and two-way ANOVA with multiple testing correction, post-hoc tests, volcano plot, and heatmap of significant features.")
+              div(class = "step-desc", "Unpaired t-test, one-way ANOVA, and two-way ANOVA with multiple testing correction, post-hoc tests, volcano plot, class bar plots, and heatmap of significant features.")
           ),
           div(class = "workflow-card",
               div(class = "step-num", "Step 9"),
+              div(class = "step-title", "Class Bar Plots"),
+              div(class = "step-desc", "Faceted bar plots of all species within a selected lipid class, with abundance range filtering, significance highlighting, and group comparison overlays.")
+          ),
+          div(class = "workflow-card",
+              div(class = "step-num", "Step 10"),
               div(class = "step-title", "Enrichment"),
               div(class = "step-desc", "Lipid set enrichment using ORA (Fisher hypergeometric) or FGSEA, across class, fatty acid identity, saturation, chain length, and ether subclass sets.")
           ),
           div(class = "workflow-card",
-              div(class = "step-num", "Step 10"),
+              div(class = "step-num", "Step 11"),
               div(class = "step-title", "Correlation Network"),
               div(class = "step-desc", "Pearson correlation network of significant lipid species within a selected group. Node colour reflects direction of change; edge width reflects correlation strength.")
           ),
           div(class = "workflow-card",
-              div(class = "step-num", "Step 11"),
+              div(class = "step-num", "Step 12"),
               div(class = "step-title", "Synthesis Pathways"),
               div(class = "step-desc", "Curated enzyme activity proxy scores (lipid class ratios) displayed as a z-scored heatmap, with group comparison statistics (t-test or one-way ANOVA per score) to identify significantly shifted pathway activities.")
           )
@@ -597,20 +630,20 @@ landing_page_ui <- function() {
           ),
           div(class = "pub-card",
               div(class = "pub-label", "License"),
-              div(class = "pub-value", "MIT License")
+              div(class = "pub-value", "AGPL-3.0 License")
           )
       ),
       tags$p("If you use LipiRich in your research, please cite:"),
       div(class = "cite-box",
           "Hancock, SE. (2025). LipiRich: A Shiny application for normalisation,
-statistics, and visualisation of MS-DIAL lipidomics data (v0.0.2).
+statistics, and visualisation of MS-DIAL lipidomics data (v0.0.3).
 GitHub: https://github.com/sarahehancock/LipiRich
 DOI: [pending]"
       ),
       
       # ── Footer ──
       div(class = "footer-note",
-          paste0("LipiRich v", APP_VERSION, " — Built with R Shiny — MS-DIAL 5.5.251021 compatible — MIT License")
+          paste0("LipiRich v", APP_VERSION, " — Built with R Shiny — MS-DIAL 5.5.251021 compatible — AGPL-3.0 License")
       )
   )
 }
@@ -1392,8 +1425,105 @@ ui <- fluidPage(
                    )
                  )
         ),
+        tabPanel("Class Bar Plots",
+                 h4("Step 9: Class bar plots of significant features"),
+                 fluidRow(
+                   column(
+                     width = 3,
+                     wellPanel(
+                       h5("Data"),
+                       uiOutput("cbp_class_ui"),
+                       selectInput("cbp_value_type", "Values to plot",
+                                   choices = c("Quantified (IS-normalised)" = "norm",
+                                               "Background-subtracted"      = "value_bs"),
+                                   selected = "norm"),
+                       selectInput("cbp_units", "Units",
+                                   choices = c("pmol" = "pmol",
+                                               "nmol" = "nmol",
+                                               "pmol/mg protein" = "pmol_mg",
+                                               "nmol/mg protein" = "nmol_mg"),
+                                   selected = "pmol"),
+                       hr(),
+                       h5("Filtering"),
+                       checkboxInput("cbp_sig_only", "Show significant species only", value = FALSE),
+                       sliderInput("cbp_abundance_range",
+                                   "Abundance range filter (% of class max)",
+                                   min = 0, max = 100, value = c(0, 100), step = 1),
+                       helpText(tags$small(
+                         "Filter species by their mean abundance relative to the most abundant",
+                         "species in the class. Use this to focus on high-, mid-, or",
+                         "low-abundance species."
+                       )),
+                       hr(),
+                       h5("Appearance"),
+                       selectInput("cbp_palette", "Colour palette",
+                                   choices = c(
+                                     "── Qualitative ──"      = "",
+                                     "Okabe-Ito (CB-safe)"   = "OkabeIto",
+                                     "Dark2"                  = "Dark2",
+                                     "Set1"                   = "Set1",
+                                     "Set2"                   = "Set2",
+                                     "Paired"                 = "Paired",
+                                     "Accent"                 = "Accent",
+                                     "Tableau 10"             = "Tableau10",
+                                     "── Sequential ──"       = "",
+                                     "Viridis"                = "viridis",
+                                     "Plasma"                 = "plasma",
+                                     "Inferno"                = "inferno",
+                                     "Blues"                  = "Blues",
+                                     "Greens"                 = "Greens",
+                                     "Purples"                = "Purples",
+                                     "── Diverging ──"        = "",
+                                     "RdBu"                   = "RdBu",
+                                     "PuOr"                   = "PuOr",
+                                     "BrBG"                   = "BrBG"
+                                   ),
+                                   selected = "OkabeIto"),
+                       numericInput("cbp_bar_alpha", "Bar opacity", value = 0.85, min = 0.2, max = 1.0, step = 0.05),
+                       numericInput("cbp_point_size", "Point size", value = 2.2, min = 0.5, max = 6.0, step = 0.2),
+                       selectInput("cbp_point_fill", "Point fill",
+                                   choices = c("Match palette" = "palette",
+                                               "Black"         = "black",
+                                               "White"         = "white"),
+                                   selected = "palette"),
+                       selectInput("cbp_point_outline", "Point outline",
+                                   choices = c("White"  = "white",
+                                               "Black"  = "black",
+                                               "None"   = "none"),
+                                   selected = "white"),
+                       selectInput("cbp_error_type", "Error bars",
+                                   choices = c("SEM" = "SEM", "SD" = "SD", "95% CI" = "CI95"),
+                                   selected = "SEM"),
+                       checkboxInput("cbp_show_points", "Overlay individual points", value = TRUE),
+                       radioButtons("cbp_sort_order", "Species order",
+                                    choices  = c("Alphabetical" = "alpha",
+                                                 "Abundance (descending)" = "abundance"),
+                                    selected = "alpha",
+                                    inline   = TRUE),
+                       hr(),
+                       h5("Export plot"),
+                       numericInput("cbp_export_width",    "Width (px)",     1600, 400, 6000, 50),
+                       numericInput("cbp_export_height",   "Height (px)",    1200, 300, 6000, 50),
+                       numericInput("cbp_export_dpi",      "DPI",             300,  72,  600, 12),
+                       numericInput("cbp_export_scale",    "Scale fraction", 1.00, 0.25, 2.00, 0.05),
+                       numericInput("cbp_export_fontsize", "Base font size",   11,    6,   24,  1),
+                       fluidRow(
+                         column(6, downloadButton("download_cbp_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_cbp_svg", "SVG"))
+                       )
+                     )
+                   ),
+                   column(
+                     width = 9,
+                     uiOutput("cbpInfoUI"),
+                     plotOutput("classBarPlot",
+                                width  = "100%",
+                                height = "auto")
+                   )
+                 )
+        ),
         tabPanel("Heatmap - significant",
-                 h4("Step 9: Heatmap of statistically significant features"),
+                 h4("Step 9b: Heatmap of statistically significant features"),
                  fluidRow(
                    column(
                      width = 3,
@@ -1616,7 +1746,7 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Synthesis Pathways",
-                 h4("Step 11: Lipid class synthesis pathway scores & enrichment"),
+                 h4("Step 12: Lipid class synthesis pathway scores & statistics"),
                  fluidRow(
                    column(
                      width = 3,
@@ -4447,19 +4577,113 @@ server <- function(input, output, session) {
   })
   
   # ---- Post-hoc annotations for the bar plot ----
-  posthoc_for_plot <- reactive({
-    req(stats_sig_plot_data())
-    req(stats_input_long())
-    
+  # Shared helper: compute pairwise comparisons for a set of features.
+  # df_long must have columns: Metabolite name, bar_group (or group), value.
+  # Returns a data frame with Metabolite name, group1, group2, p, p.adj,
+  # p.adj.signif — or NULL if nothing significant.
+  .compute_pairwise <- function(df_long, group_col = "bar_group",
+                                padj_method = "BH", alpha = 0.05,
+                                use_adj = TRUE) {
     normalize_pcols <- function(x) {
       nm <- names(x)
       if ("adj.p.value" %in% nm && !"p.adj" %in% nm) x <- dplyr::rename(x, p.adj = `adj.p.value`)
-      if ("p_adj" %in% nm      && !"p.adj" %in% nm) x <- dplyr::rename(x, p.adj = p_adj)
-      if ("p.signif" %in% nm   && !"p.adj.signif" %in% nm) x <- dplyr::rename(x, p.adj.signif = p.signif)
+      if ("p_adj"       %in% nm && !"p.adj" %in% nm) x <- dplyr::rename(x, p.adj = p_adj)
+      if ("p.signif"    %in% nm && !"p.adj.signif" %in% nm) x <- dplyr::rename(x, p.adj.signif = p.signif)
       x
     }
-    get_num <- function(df, nm) if (nm %in% names(df)) as.numeric(df[[nm]]) else rep(NA_real_, nrow(df))
-    get_chr <- function(df, nm) if (nm %in% names(df)) as.character(df[[nm]]) else rep(NA_character_, nrow(df))
+    use_rstatix <- requireNamespace("rstatix", quietly = TRUE)
+    feats       <- unique(df_long$`Metabolite name`)
+    ann_list    <- list()
+    
+    for (met in feats) {
+      dmet <- df_long %>%
+        dplyr::filter(`Metabolite name` == met, !is.na(.data[[group_col]]),
+                      !is.na(value))
+      if (!identical(group_col, "bar_group"))
+        dmet <- dmet %>% dplyr::rename(bar_group = dplyr::all_of(group_col))
+      k <- dplyr::n_distinct(dmet$bar_group)
+      if (k < 2) next
+      comps <- NULL
+      
+      if (k == 2) {
+        if (use_rstatix) {
+          comps <- tryCatch({
+            normalize_pcols(
+              rstatix::t_test(value ~ bar_group, dmet) |>
+                rstatix::adjust_pvalue(method = if (identical(padj_method, "none")) "none" else padj_method) |>
+                rstatix::add_significance()
+            )
+          }, error = function(e) NULL)
+          if (!is.null(comps) && nrow(comps) > 0) {
+            if (!all(c("group1","group2") %in% names(comps))) {
+              lv <- levels(dmet$bar_group); comps$group1 <- lv[1]; comps$group2 <- lv[2]
+            }
+            comps <- dplyr::transmute(comps,
+                                      group1 = as.character(group1), group2 = as.character(group2),
+                                      p      = dplyr::coalesce(as.numeric(p), as.numeric(p.adj)),
+                                      p.adj  = dplyr::coalesce(as.numeric(p.adj), as.numeric(p)),
+                                      p.adj.signif = as.character(p.adj.signif))
+          } else comps <- NULL
+        }
+        if (is.null(comps)) {
+          tt <- tryCatch(stats::t.test(value ~ bar_group, dmet), error = function(e) NULL)
+          if (!is.null(tt)) {
+            lv <- sort(unique(as.character(dmet$bar_group)))
+            pval <- tt$p.value
+            comps <- tibble::tibble(
+              group1 = lv[1], group2 = lv[2],
+              p = pval, p.adj = pval,
+              p.adj.signif = dplyr::case_when(
+                pval < 0.001 ~ "***", pval < 0.01 ~ "**",
+                pval < 0.05  ~ "*",  TRUE ~ "ns"))
+          }
+        }
+      } else {
+        # ≥3 groups: Tukey HSD
+        if (use_rstatix) {
+          comps <- tryCatch({
+            fit <- stats::aov(value ~ bar_group, data = dmet)
+            tk  <- rstatix::tukey_hsd(fit)
+            normalize_pcols(tk) |>
+              dplyr::transmute(
+                group1 = as.character(group1), group2 = as.character(group2),
+                p      = dplyr::coalesce(as.numeric(p), as.numeric(p.adj)),
+                p.adj  = dplyr::coalesce(as.numeric(p.adj), as.numeric(p)),
+                p.adj.signif = as.character(p.adj.signif))
+          }, error = function(e) NULL)
+        }
+        if (is.null(comps)) {
+          comps <- tryCatch({
+            fit <- stats::aov(value ~ bar_group, data = dmet)
+            tk  <- as.data.frame(stats::TukeyHSD(fit, "bar_group")$bar_group)
+            tk$contrast <- rownames(tk); rownames(tk) <- NULL
+            parts <- strsplit(tk$contrast, "-")
+            tibble::tibble(
+              group1 = vapply(parts, `[`, "", 1L),
+              group2 = vapply(parts, `[`, "", 2L),
+              p      = tk[["p adj"]], p.adj = tk[["p adj"]],
+              p.adj.signif = dplyr::case_when(
+                p.adj < 0.001 ~ "***", p.adj < 0.01 ~ "**",
+                p.adj < 0.05  ~ "*",  TRUE ~ "ns"))
+          }, error = function(e) NULL)
+        }
+      }
+      
+      if (is.null(comps) || nrow(comps) == 0) next
+      p_col <- if (use_adj && "p.adj" %in% names(comps)) "p.adj" else "p"
+      comps <- comps %>%
+        dplyr::filter(.data[[p_col]] < alpha) %>%
+        dplyr::mutate(`Metabolite name` = met)
+      if (nrow(comps) > 0) ann_list[[length(ann_list) + 1]] <- comps
+    }
+    
+    if (length(ann_list) == 0) return(NULL)
+    dplyr::bind_rows(ann_list)
+  }
+  
+  posthoc_for_plot <- reactive({
+    req(stats_sig_plot_data())
+    req(stats_input_long())
     
     sdf    <- stats_sig_plot_data()
     df_all <- stats_input_long()
@@ -4467,187 +4691,25 @@ server <- function(input, output, session) {
     show_two_way <- any(stats_results_val()$test == "twoway")
     hasA <- any(!is.na(df_all$factorA))
     hasB <- any(!is.na(df_all$factorB))
-    if (isTRUE(show_two_way) && isTRUE(hasA && hasB)) {
-      df_all <- df_all %>% dplyr::mutate(bar_group = interaction(factorA, factorB, drop = TRUE))
-    } else {
-      df_all <- df_all %>% dplyr::mutate(bar_group = factor(group))
-    }
-    df_all <- df_all %>% dplyr::filter(!is.na(bar_group))
+    df_all <- df_all %>%
+      dplyr::mutate(bar_group = if (isTRUE(show_two_way) && hasA && hasB)
+        interaction(factorA, factorB, drop = TRUE)
+        else factor(group)) %>%
+      dplyr::filter(!is.na(bar_group))
     
+    feats <- unique(c(levels(sdf$`Metabolite name`), sdf$`Metabolite name`))
+    df_feats <- df_all %>%
+      dplyr::filter(`Metabolite name` %in% feats) %>%
+      dplyr::select(`Metabolite name`, bar_group, value)
     
-    feats <- levels(sdf$`Metabolite name`)
-    if (is.null(feats)) feats <- unique(sdf$`Metabolite name`)
-    use_rstatix <- requireNamespace("rstatix", quietly = TRUE)
-    
-    ann_list <- list()
-    for (met in feats) {
-      dmet <- df_all %>% dplyr::filter(`Metabolite name` == met)
-      if (nrow(dmet) == 0 || dplyr::n_distinct(dmet$bar_group) < 2) next
-      
-      comps <- NULL
-      k <- dplyr::n_distinct(dmet$bar_group)
-      
-      if (k == 2) {
-        if (use_rstatix) {
-          comps <- tryCatch({
-            rstatix::t_test(value ~ bar_group, dmet) |>
-              rstatix::adjust_pvalue(method = if (identical(input$padj_method, "none")) "none" else input$padj_method) |>
-              rstatix::add_significance()
-          }, error = function(e) NULL)
-          if (!is.null(comps) && nrow(comps) > 0) {
-            comps <- normalize_pcols(comps)
-            if (!all(c("group1","group2") %in% names(comps))) {
-              lv <- levels(dmet$bar_group)
-              comps$group1 <- lv[1]; comps$group2 <- lv[2]
-            }
-            p_raw  <- get_num(comps, "p")
-            p_adj  <- get_num(comps, "p.adj")
-            comps <- dplyr::transmute(
-              comps,
-              group1  = get_chr(comps, "group1"),
-              group2  = get_chr(comps, "group2"),
-              p       = dplyr::coalesce(p_raw, p_adj),
-              p.adj   = dplyr::coalesce(p_adj, p_raw),
-              p.adj.signif = get_chr(comps, "p.adj.signif")
-            )
-          }
-        }
-        if (is.null(comps)) {
-          tt <- tryCatch(stats::t.test(value ~ bar_group, dmet), error = function(e) NULL)
-          if (!is.null(tt)) {
-            lv <- levels(dmet$bar_group)
-            comps <- tibble::tibble(
-              group1 = lv[1],
-              group2 = lv[2],
-              p      = tt$p.value,
-              p.adj  = tt$p.value,
-              p.adj.signif = dplyr::case_when(
-                p.adj < 0.001 ~ "***",
-                p.adj < 0.01  ~ "**",
-                p.adj < 0.05  ~ "*",
-                TRUE          ~ "ns"
-              )
-            )
-          }
-        }
-      } else {
-        want_tukey    <- "tukey" %in% (input$posthoc %||% character(0))
-        want_pairwise <- "pairwise" %in% (input$posthoc %||% character(0))
-        
-        if (want_tukey) {
-          if (use_rstatix) {
-            comps <- tryCatch({
-              fit <- stats::aov(value ~ bar_group, data = dmet)
-              rstatix::tukey_hsd(fit)
-            }, error = function(e) NULL)
-            if (!is.null(comps) && nrow(comps) > 0) {
-              comps <- normalize_pcols(comps)
-              p_raw <- get_num(comps, "p")
-              p_adj <- get_num(comps, "p.adj")
-              comps <- dplyr::transmute(
-                comps,
-                group1 = get_chr(comps, "group1"),
-                group2 = get_chr(comps, "group2"),
-                p      = dplyr::coalesce(p_adj, p_raw),
-                p.adj  = dplyr::coalesce(p_adj, p_raw),
-                p.adj.signif = get_chr(comps, "p.adj.signif")
-              )
-            }
-          }
-          if (is.null(comps)) {
-            tk <- tryCatch(stats::TukeyHSD(stats::aov(value ~ bar_group, data = dmet), "bar_group"),
-                           error = function(e) NULL)
-            if (!is.null(tk)) {
-              df <- as.data.frame(tk$bar_group)
-              df$contrast <- rownames(df)
-              rownames(df) <- NULL
-              parts <- strsplit(df$contrast, "-")
-              comps <- tibble::tibble(
-                group1 = vapply(parts, `[`, "", 1),
-                group2 = vapply(parts, `[`, "", 2),
-                p      = df$`p adj`,
-                p.adj  = df$`p adj`,
-                p.adj.signif = dplyr::case_when(
-                  p.adj < 0.001 ~ "***",
-                  p.adj < 0.01  ~ "**",
-                  p.adj < 0.05  ~ "*",
-                  TRUE          ~ "ns"
-                )
-              )
-            }
-          }
-        } else if (want_pairwise) {
-          if (use_rstatix) {
-            comps <- tryCatch({
-              rstatix::pairwise_t_test(value ~ bar_group, dmet, p.adjust.method = "holm")
-            }, error = function(e) NULL)
-            if (!is.null(comps) && nrow(comps) > 0) {
-              comps <- normalize_pcols(comps)
-              p_raw <- get_num(comps, "p")
-              p_adj <- get_num(comps, "p.adj")
-              comps <- dplyr::transmute(
-                comps,
-                group1 = get_chr(comps, "group1"),
-                group2 = get_chr(comps, "group2"),
-                p      = dplyr::coalesce(p_raw, p_adj),
-                p.adj  = dplyr::coalesce(p_adj, p_raw),
-                p.adj.signif = get_chr(comps, "p.adj.signif")
-              )
-            }
-          }
-          if (is.null(comps)) {
-            pw <- tryCatch(stats::pairwise.t.test(dmet$value, dmet$bar_group, p.adjust.method = "holm"),
-                           error = function(e) NULL)
-            if (!is.null(pw) && !is.null(pw$p.value)) {
-              comps <- tibble::tibble()
-              mat <- pw$p.value
-              for (i in seq_len(nrow(mat))) for (j in seq_len(ncol(mat))) {
-                if (!is.na(mat[i, j])) {
-                  comps <- dplyr::bind_rows(comps, tibble::tibble(
-                    group1 = rownames(mat)[i],
-                    group2 = colnames(mat)[j],
-                    p      = mat[i, j],
-                    p.adj  = mat[i, j],
-                    p.adj.signif = dplyr::case_when(
-                      p.adj < 0.001 ~ "***",
-                      p.adj < 0.01  ~ "**",
-                      p.adj < 0.05  ~ "*",
-                      TRUE          ~ "ns"
-                    )
-                  ))
-                }
-              }
-            }
-          }
-        }
-      }
-      
-      if (is.null(comps) || nrow(comps) == 0) next
-      
-      alpha   <- input$alpha %||% 0.05
-      use_adj <- isTRUE(input$use_adj_threshold) && !identical(input$padj_method, "none")
-      comps <- comps %>% dplyr::mutate(p_keep = dplyr::coalesce(.data$p.adj, .data$p))
-      comps <- if (use_adj) dplyr::filter(comps, .data$p_keep < alpha) else dplyr::filter(comps, .data$p < alpha | .data$p_keep < alpha)
-      if (nrow(comps) == 0) next
-      
-      top <- sdf %>% dplyr::filter(`Metabolite name` == met) %>%
-        dplyr::summarise(top = max(.data$ymax, na.rm = TRUE)) %>% dplyr::pull(top)
-      if (!is.finite(top)) top <- 1
-      step <- 0.07 * top
-      
-      comps <- comps %>%
-        dplyr::mutate(
-          `Metabolite name` = met,
-          y.position = top + step * dplyr::row_number(),
-          p_label    = dplyr::if_else(!is.na(.data$p.adj.signif), .data$p.adj.signif,
-                                      sprintf("p=%.3g", dplyr::coalesce(.data$p.adj, .data$p)))
-        )
-      
-      ann_list[[length(ann_list) + 1]] <- comps
-    }
-    
-    if (length(ann_list) == 0) return(NULL)
-    dplyr::bind_rows(ann_list)
+    .compute_pairwise(
+      df_long     = df_feats,
+      group_col   = "bar_group",
+      padj_method = input$padj_method %||% "BH",
+      alpha       = input$alpha %||% 0.05,
+      use_adj     = isTRUE(input$use_adj_threshold) &&
+        !identical(input$padj_method %||% "BH", "none")
+    )
   })
   
   current_plot_index <- reactiveVal(1)
@@ -4763,22 +4825,21 @@ server <- function(input, output, session) {
         comps <- NULL
         
         if (k == 2) {
-          if (requireNamespace("rstatix", quietly = TRUE)) {
-            comps <- try(
-              rstatix::t_test(value ~ bar_group, df_all) |>
-                rstatix::adjust_pvalue(method = padj_method) |>
+          lv <- levels(df_all$bar_group)
+          if (length(lv) == 2 && requireNamespace("rstatix", quietly = TRUE)) {
+            tt <- try(
+              rstatix::t_test(value ~ bar_group, data = df_all, var.equal = FALSE) |>
+                rstatix::adjust_pvalue(method = if (identical(padj_method, "none")) "none" else padj_method) |>
                 rstatix::add_significance(),
               silent = TRUE)
-            if (!inherits(comps, "try-error") && !is.null(comps) && nrow(comps) > 0) {
-              if (!all(c("group1","group2") %in% names(comps))) {
-                lv <- levels(df_all$bar_group)
-                comps$group1 <- lv[1]; comps$group2 <- lv[2]
-              }
-              comps <- comps |>
+            if (!inherits(tt, "try-error") && !is.null(tt) && nrow(tt) > 0) {
+              comps <- tt |>
                 dplyr::mutate(
-                  p     = dplyr::coalesce(.data$p, .data$p.adj),
-                  p.adj = dplyr::coalesce(.data$p.adj, .data$p),
-                  p_label = dplyr::coalesce(.data$p.adj.signif, sprintf("p=%.3g", p.adj))
+                  group1  = as.character(group1),
+                  group2  = as.character(group2),
+                  p       = dplyr::coalesce(as.numeric(.data$p),     as.numeric(.data$p.adj)),
+                  p.adj   = dplyr::coalesce(as.numeric(.data$p.adj), as.numeric(.data$p)),
+                  p_label = dplyr::coalesce(.data$p.adj.signif, sprintf("p = %.3g", p.adj))
                 ) |>
                 dplyr::select(group1, group2, p, p.adj, p_label)
             } else comps <- NULL
@@ -5029,6 +5090,15 @@ server <- function(input, output, session) {
   
   
   
+  output$sigHeatmapInfo <- renderText({
+    res <- stats_results_val()
+    if (is.null(res) || nrow(res) == 0) return("")
+    tests <- unique(res$test)
+    if (all(tests == "ttest")) {
+      "Note: column clustering is disabled for t-test results (only 2 columns)."
+    } else ""
+  })
+  
   output$sigHeatmap <- renderPlot({
     hd  <- sig_heatmap_data()
     mat <- hd$mat
@@ -5040,7 +5110,7 @@ server <- function(input, output, session) {
       mat,
       color            = cols,
       cluster_rows     = isTRUE(input$hm_cluster_rows),
-      cluster_cols     = isTRUE(input$hm_cluster_cols),
+      cluster_cols     = isTRUE(input$hm_cluster_cols) && ncol(mat) >= 3,
       clustering_distance_rows = dist_opt,
       clustering_distance_cols = dist_opt,
       clustering_method = method_opt,
@@ -5090,7 +5160,7 @@ server <- function(input, output, session) {
       hd$mat,
       color = .heatmap_palette(input$hm_palette %||% "viridis"),
       cluster_rows = isTRUE(input$hm_cluster_rows),
-      cluster_cols = isTRUE(input$hm_cluster_cols),
+      cluster_cols = isTRUE(input$hm_cluster_cols) && ncol(hd$mat) >= 3,
       clustering_distance_rows = input$hm_dist    %||% "correlation",
       clustering_distance_cols = input$hm_dist    %||% "correlation",
       clustering_method        = input$hm_linkage %||% "complete",
@@ -6115,10 +6185,10 @@ server <- function(input, output, session) {
       ),
       
       # --- EXISTING SCORES (unchanged) ---
-      "TAG storage (DAG/TG)" = list(
+      "TAG storage (TG/DAG)" = list(
         type = "ratio",
-        num  = c("DAG"),
-        den  = c("TG")
+        num  = c("TG"),
+        den  = c("DAG")
       ),
       "DGAT activity (TG/(TG + DAG))" = list(
         type = "fraction",
@@ -6729,7 +6799,470 @@ server <- function(input, output, session) {
       )
   })
   
-  # ========== VOLCANO PLOT ==========
+  # ========== CLASS BAR PLOTS TAB ==========
+  
+  # Class selector — sources classes from bg_norm_long_resolved so it is
+  # populated as soon as data is loaded, not only after stats are run
+  output$cbp_class_ui <- renderUI({
+    df <- tryCatch(bg_norm_long_resolved(), error = function(e) NULL)
+    classes <- if (!is.null(df) && "plot_class" %in% names(df))
+      sort(unique(df$plot_class[!stringr::str_detect(df$`Metabolite name`, "\\[IS\\]")]))
+    else character(0)
+    selectInput("cbp_class", "Lipid class",
+                choices  = classes,
+                selected = if (length(classes)) classes[1] else NULL)
+  })
+  
+  # Core reactive: filtered species for the selected class
+  cbp_data <- reactive({
+    req(bg_norm_long_resolved(), stats_results_all())
+    # Use stats_results_all so all tested species are available regardless of
+    # the significance filter; sig_only toggle is applied within this reactive
+    res <- stats_results_all()
+    validate(need(nrow(res) > 0, "No features for this class. Run statistics first."))
+    
+    # Build long df from bg_norm_long_resolved — same filtering as stats_input_long
+    df_long <- bg_norm_long_resolved() %>%
+      dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
+      dplyr::mutate(sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample)))
+    df_long <- filter_blanks(df_long, input$exclude_blank_stats,
+                             sample_col = "sample_norm", exact = FALSE)
+    df_long <- filter_iqc(df_long, include_iqc = FALSE, sample_col = "sample")
+    
+    # Apply grouping and restrict to stats-selected groups
+    fn  <- get_active_grouping()
+    grp_res <- fn(df_long$sample)
+    df_long$group <- grp_res$group
+    sel_grps <- input$stats_selected_groups
+    if (!is.null(sel_grps) && length(sel_grps) > 0) {
+      df_long <- df_long %>% dplyr::filter(group %in% sel_grps)
+    }
+    
+    # Value type — column names are "norm" and "value_bs" in bg_norm_long_resolved
+    measure_col <- if (identical(input$cbp_value_type %||% "norm", "value_bs")) "value_bs" else "norm"
+    if (!measure_col %in% names(df_long)) measure_col <- names(df_long)[grep("^norm$|^value_bs$", names(df_long))[1]]
+    df_long <- df_long %>%
+      dplyr::mutate(value_plot = .data[[measure_col]])
+    
+    # Restrict to features present in stats results
+    df_long <- df_long %>% dplyr::filter(`Metabolite name` %in% res$metabolite)
+    
+    # Class filter — always filter to the selected class
+    cls <- input$cbp_class
+    req(nzchar(cls %||% ""))
+    res     <- res     %>% dplyr::filter(plot_class == cls)
+    df_long <- df_long %>% dplyr::filter(plot_class == cls)
+    validate(need(nrow(res) > 0 && nrow(df_long) > 0,
+                  "No features for this class. Run statistics first."))
+    
+    # Significant-only filter
+    alpha   <- input$alpha %||% 0.05
+    use_adj <- isTRUE(input$use_adj_threshold) && !identical(input$padj_method, "none")
+    sig_mask <- if (use_adj) (!is.na(res$p_adj) & res$p_adj < alpha) else (!is.na(res$p) & res$p < alpha)
+    sig_feats <- res$metabolite[sig_mask]
+    
+    if (isTRUE(input$cbp_sig_only)) {
+      res     <- res[sig_mask, , drop = FALSE]
+      df_long <- df_long %>% dplyr::filter(`Metabolite name` %in% sig_feats)
+      validate(need(nrow(res) > 0, "No significant features under current thresholds."))
+    }
+    
+    # Abundance range filter — based on mean value_plot across all samples
+    ab_range <- input$cbp_abundance_range %||% c(0, 100)
+    if (ab_range[1] > 0 || ab_range[2] < 100) {
+      means_per_feat <- df_long %>%
+        dplyr::group_by(`Metabolite name`) %>%
+        dplyr::summarise(mean_val = mean(value_plot, na.rm = TRUE), .groups = "drop")
+      max_val <- max(means_per_feat$mean_val, na.rm = TRUE)
+      if (is.finite(max_val) && max_val > 0) {
+        pct  <- means_per_feat$mean_val / max_val * 100
+        keep <- means_per_feat$`Metabolite name`[pct >= ab_range[1] & pct <= ab_range[2]]
+        df_long <- df_long %>% dplyr::filter(`Metabolite name` %in% keep)
+        res     <- res     %>% dplyr::filter(metabolite %in% keep)
+        sig_feats <- sig_feats[sig_feats %in% keep]
+      }
+      validate(need(nrow(df_long) > 0,
+                    "No features remain after abundance filter. Adjust the range."))
+    }
+    
+    df_long <- df_long %>%
+      dplyr::mutate(significant = `Metabolite name` %in% sig_feats)
+    
+    # Use .compute_pairwise directly on cbp_data's own filtered long data.
+    # Pass a clean minimal frame to avoid column name conflicts.
+    ph_class <- tryCatch(
+      .compute_pairwise(
+        df_long = df_long %>%
+          dplyr::transmute(
+            `Metabolite name` = `Metabolite name`,
+            bar_group         = group,
+            value             = value_plot
+          ),
+        group_col   = "bar_group",
+        padj_method = input$padj_method %||% "BH",
+        alpha       = input$alpha %||% 0.05,
+        use_adj     = isTRUE(input$use_adj_threshold) &&
+          !identical(input$padj_method %||% "BH", "none")
+      ),
+      error = function(e) NULL
+    )
+    
+    list(df = df_long, res = res, sig_feats = sig_feats,
+         measure_col = measure_col, posthoc = ph_class)
+  })
+  
+  # Info text
+  output$cbpInfoUI <- renderUI({
+    d <- tryCatch(cbp_data(), error = function(e) NULL)
+    if (is.null(d)) return(NULL)
+    n_total <- dplyr::n_distinct(d$df$`Metabolite name`)
+    n_sig   <- length(d$sig_feats)
+    tags$p(tags$small(
+      paste0(n_total, " species shown (", n_sig, " significant).")
+    ))
+  })
+  
+  # Build the class bar plot — single grouped bar plot, species on x-axis
+  .build_cbp <- function(fsz = 11) {
+    d        <- cbp_data()
+    df       <- d$df
+    err_type <- input$cbp_error_type  %||% "SEM"
+    show_pts <- isTRUE(input$cbp_show_points)
+    
+    # Compute summary stats per feature × group
+    summ <- df %>%
+      dplyr::group_by(`Metabolite name`, group) %>%
+      dplyr::summarise(
+        mean_val = mean(value_plot, na.rm = TRUE),
+        sd_val   = sd(value_plot, na.rm = TRUE),
+        n_val    = sum(!is.na(value_plot)),
+        .groups  = "drop"
+      ) %>%
+      dplyr::mutate(
+        se  = sd_val / sqrt(pmax(n_val, 1)),
+        ci  = qt(0.975, df = pmax(n_val - 1, 1)) * se,
+        err = switch(err_type, SEM = se, SD = sd_val, CI95 = ci, se)
+      )
+    
+    # Species order — alphabetical or by total abundance
+    sort_order <- input$cbp_sort_order %||% "alpha"
+    feat_order <- if (identical(sort_order, "abundance")) {
+      summ %>%
+        dplyr::group_by(`Metabolite name`) %>%
+        dplyr::summarise(total = sum(mean_val, na.rm = TRUE), .groups = "drop") %>%
+        dplyr::arrange(dplyr::desc(total)) %>%
+        dplyr::pull(`Metabolite name`)
+    } else {
+      sort(unique(as.character(summ$`Metabolite name`)))
+    }
+    summ <- summ %>%
+      dplyr::mutate(
+        species   = factor(`Metabolite name`, levels = feat_order),
+        is_sig    = `Metabolite name` %in% d$sig_feats
+      )
+    
+    # Group colour palette
+    n_groups     <- dplyr::n_distinct(summ$group)
+    group_levels <- sort(unique(summ$group))
+    palette_id   <- input$cbp_palette %||% "OkabeIto"
+    bar_alpha    <- input$cbp_bar_alpha  %||% 0.85
+    pt_size      <- input$cbp_point_size %||% 2.2
+    
+    # Colour resolution
+    okabe_ito  <- c("#E69F00","#56B4E9","#009E73","#F0E442",
+                    "#0072B2","#D55E00","#CC79A7","#000000")
+    tableau10  <- c("#4E79A7","#F28E2B","#E15759","#76B7B2","#59A14F",
+                    "#EDC948","#B07AA1","#FF9DA7","#9C755F","#BAB0AC")
+    viridis_opts <- c("viridis","plasma","inferno","magma","cividis")
+    brewer_qual  <- c("Set1","Set2","Dark2","Paired","Accent","Pastel1",
+                      "RdBu","PuOr","BrBG","Blues","Greens","Purples")
+    
+    pal <- if (palette_id == "OkabeIto") {
+      okabe_ito[seq_len(min(n_groups, length(okabe_ito)))]
+    } else if (palette_id == "Tableau10") {
+      tableau10[seq_len(min(n_groups, length(tableau10)))]
+    } else if (palette_id %in% viridis_opts) {
+      viridis::viridis(n_groups, option = palette_id, end = 0.85)
+    } else if (palette_id %in% brewer_qual) {
+      max_cols <- RColorBrewer::brewer.pal.info[palette_id, "maxcolors"]
+      if (n_groups <= max_cols) {
+        RColorBrewer::brewer.pal(max(3, n_groups), palette_id)[seq_len(n_groups)]
+      } else {
+        colorRampPalette(RColorBrewer::brewer.pal(max_cols, palette_id))(n_groups)
+      }
+    } else {
+      # Fallback
+      scales::hue_pal()(n_groups)
+    }
+    pal <- setNames(pal, group_levels)
+    
+    # Slightly darker border per bar — 55% luminance of fill
+    darken <- function(col, fac = 0.55) {
+      m <- col2rgb(col) / 255
+      grDevices::rgb(m[1]*fac, m[2]*fac, m[3]*fac)
+    }
+    border_pal <- setNames(sapply(pal, darken), group_levels)
+    
+    dodge_w <- 0.8
+    
+    p <- ggplot2::ggplot(
+      summ,
+      ggplot2::aes(x = species, y = mean_val, fill = group, colour = group)
+    ) +
+      ggplot2::geom_col(
+        position  = ggplot2::position_dodge(width = dodge_w),
+        width     = 0.72,
+        linewidth = 0.4,
+        alpha     = bar_alpha
+      ) +
+      ggplot2::geom_errorbar(
+        ggplot2::aes(ymin = pmax(0, mean_val - err), ymax = mean_val + err),
+        position  = ggplot2::position_dodge(width = dodge_w),
+        width     = 0.18,
+        linewidth = 0.5,
+        colour    = "grey20"
+      ) +
+      ggplot2::scale_fill_manual(values = pal,        name = NULL) +
+      ggplot2::scale_colour_manual(values = border_pal, guide = "none") +
+      ggplot2::labs(
+        x       = NULL,
+        y       = input$cbp_units %||% "pmol",
+        caption = paste0("Error bars: ", err_type)
+      ) +
+      ggplot2::theme_minimal(base_size = fsz) +
+      ggplot2::theme(
+        axis.text.x        = ggplot2::element_text(angle = 30, hjust = 1),
+        axis.line.x        = ggplot2::element_line(colour = "grey70", linewidth = 0.4),
+        axis.line.y        = ggplot2::element_line(colour = "grey70", linewidth = 0.4),
+        panel.grid.minor   = ggplot2::element_blank(),
+        panel.grid.major.x = ggplot2::element_blank(),
+        panel.grid.major.y = ggplot2::element_line(colour = "grey90", linewidth = 0.35),
+        legend.position    = "right",
+        legend.key.size    = ggplot2::unit(0.8, "lines"),
+        plot.margin        = ggplot2::margin(t = 8, r = 16, b = 8, l = 48, unit = "pt")
+      ) +
+      ggplot2::scale_x_discrete(expand = ggplot2::expansion(add = 1.2))
+    
+    # Individual points — fill and outline controlled by UI
+    if (show_pts && nrow(df) > 0) {
+      pt_fill_mode    <- input$cbp_point_fill    %||% "palette"
+      pt_outline_mode <- input$cbp_point_outline %||% "white"
+      
+      df_pts <- df %>%
+        dplyr::mutate(
+          species = factor(`Metabolite name`, levels = feat_order),
+          pt_fill = dplyr::case_when(
+            pt_fill_mode == "palette" ~ pal[as.character(group)],
+            pt_fill_mode == "black"   ~ "#222222",
+            pt_fill_mode == "white"   ~ "#ffffff",
+            TRUE ~ pal[as.character(group)]
+          )
+        )
+      
+      # Shape 21 always — outline=none achieved by matching colour to fill
+      pt_stroke <- if (identical(pt_outline_mode, "none")) 0 else 0.65
+      
+      p <- p + ggplot2::geom_point(
+        data     = df_pts,
+        ggplot2::aes(x = species, y = value_plot, group = group),
+        position = ggplot2::position_jitterdodge(
+          jitter.width = 0.07,
+          dodge.width  = dodge_w,
+          seed         = 42
+        ),
+        shape       = 21,
+        size        = pt_size,
+        stroke      = pt_stroke,
+        fill        = df_pts$pt_fill,
+        colour      = dplyr::case_when(
+          pt_outline_mode == "none"  ~ df_pts$pt_fill,
+          pt_outline_mode == "black" ~ "#222222",
+          TRUE                       ~ "white"
+        ),
+        alpha       = 0.92,
+        inherit.aes = FALSE
+      )
+    }
+    
+    # Significance brackets — drawn from posthoc_for_plot data if available,
+    # otherwise from overall stats p-value (for t-test / ANOVA without posthoc)
+    if (length(d$sig_feats) > 0) {
+      tryCatch({
+        ph       <- d$posthoc   # may be NULL if no posthoc was run
+        alpha_br <- input$alpha %||% 0.05
+        use_adj_f <- isTRUE(input$use_adj_threshold) &&
+          !identical(input$padj_method %||% "BH", "none")
+        
+        y_global_top <- max(summ$mean_val + summ$err, na.rm = TRUE)
+        if (!is.finite(y_global_top)) y_global_top <- 1
+        tip <- 0.025 * y_global_top
+        bracket_tops <- numeric(0)
+        
+        # Helper: draw one bracket between two x positions
+        draw_bracket <- function(p, x1, x2, y_br, y_cap, sym) {
+          p +
+            ggplot2::annotate("segment",
+                              x = x1, xend = x1, y = y_br - tip, yend = y_cap,
+                              colour = "grey30", linewidth = 0.4) +
+            ggplot2::annotate("segment",
+                              x = x2, xend = x2, y = y_br - tip, yend = y_cap,
+                              colour = "grey30", linewidth = 0.4) +
+            ggplot2::annotate("segment",
+                              x = x1, xend = x2, y = y_cap, yend = y_cap,
+                              colour = "grey30", linewidth = 0.4) +
+            ggplot2::annotate("text",
+                              x = (x1 + x2) / 2, y = y_cap + 0.01 * y_global_top,
+                              label = sym, vjust = 0, size = fsz * 0.32, colour = "grey20")
+        }
+        
+        # x offset of each bar within a dodged species group
+        # With position_dodge(width=dodge_w) and n groups evenly spaced:
+        # bar_centres[i] = sp_idx + dodge_w * ((i - 1) / (n-1) - 0.5) * (n-1)/n
+        # Simplify: centres are sp_idx + seq(-0.5, 0.5, len=n)*dodge_w*(n-1)/n
+        bar_offsets <- function(n) {
+          if (n == 1) return(0)
+          dodge_w * seq(-(n-1), (n-1), by = 2) / (2*n)
+        }
+        grp_offsets <- setNames(bar_offsets(length(group_levels)), group_levels)
+        
+        for (sp in d$sig_feats) {
+          sp_idx  <- which(feat_order == sp)
+          if (length(sp_idx) == 0) next
+          sp_summ <- summ %>% dplyr::filter(`Metabolite name` == sp)
+          y_top   <- max(sp_summ$mean_val + sp_summ$err, na.rm = TRUE)
+          if (!is.finite(y_top)) next
+          
+          # Posthoc comparisons for this species
+          sp_ph <- if (!is.null(ph))
+            ph %>% dplyr::filter(`Metabolite name` == sp)
+          else NULL
+          
+          if (!is.null(sp_ph) && nrow(sp_ph) > 0) {
+            # Draw one bracket per significant pairwise comparison, stacking upward
+            sp_ph <- sp_ph %>%
+              dplyr::mutate(
+                p_use = if (use_adj_f) dplyr::coalesce(p.adj, p) else p,
+                sym   = dplyr::case_when(
+                  p_use < 0.001 ~ "***",
+                  p_use < 0.01  ~ "**",
+                  p_use < 0.05  ~ "*",
+                  TRUE          ~ "ns"
+                )
+              ) %>%
+              dplyr::filter(sym != "ns",
+                            group1 %in% group_levels,
+                            group2 %in% group_levels) %>%
+              dplyr::arrange(p_use)
+            
+            y_step <- 0.10 * y_global_top
+            for (bi in seq_len(nrow(sp_ph))) {
+              row   <- sp_ph[bi, ]
+              x1    <- sp_idx + grp_offsets[as.character(row$group1)]
+              x2    <- sp_idx + grp_offsets[as.character(row$group2)]
+              y_br  <- y_top + 0.05 * y_global_top + (bi - 1) * y_step
+              y_cap <- y_br + 0.04 * y_global_top
+              bracket_tops <- c(bracket_tops, y_cap)
+              p <- draw_bracket(p, x1, x2, y_br, y_cap, row$sym)
+            }
+            
+          } else {
+            # No posthoc — single bracket spanning all groups (or star for >2)
+            sp_res  <- d$res %>% dplyr::filter(metabolite == sp)
+            pval    <- if (nrow(sp_res) > 0) {
+              if (use_adj_f && !is.na(sp_res$p_adj[1])) sp_res$p_adj[1]
+              else sp_res$p[1]
+            } else NA_real_
+            sym <- dplyr::case_when(
+              is.na(pval)  ~ "",
+              pval < 0.001 ~ "***",
+              pval < 0.01  ~ "**",
+              pval < 0.05  ~ "*",
+              TRUE         ~ "ns"
+            )
+            if (!nzchar(sym) || sym == "ns") next
+            
+            if (length(group_levels) == 2) {
+              x1   <- sp_idx + grp_offsets[group_levels[1]]
+              x2   <- sp_idx + grp_offsets[group_levels[2]]
+              y_br  <- y_top + 0.05 * y_global_top
+              y_cap <- y_br + 0.04 * y_global_top
+              bracket_tops <- c(bracket_tops, y_cap)
+              p <- draw_bracket(p, x1, x2, y_br, y_cap, sym)
+            } else {
+              # ≥3 groups, no posthoc: single star above species
+              y_cap <- y_top + 0.08 * y_global_top
+              bracket_tops <- c(bracket_tops, y_cap)
+              p <- p + ggplot2::annotate("text",
+                                         x = sp_idx, y = y_cap,
+                                         label = sym, vjust = 0, size = fsz * 0.38, colour = "grey20")
+            }
+          }
+        }
+        
+        if (length(bracket_tops) > 0) {
+          p <- p + ggplot2::expand_limits(
+            y = max(bracket_tops, na.rm = TRUE) * 1.1
+          )
+        }
+      }, error = function(e) NULL)
+    }
+    
+    p
+  }
+  
+  # Fixed height for single plot
+  cbp_height <- reactive({ 550 })
+  
+  output$classBarPlot <- renderPlot({
+    validate(need(!is.null(stats_results_val()) && nrow(stats_results_val()) > 0,
+                  "Run statistics first."))
+    fsz <- input$cbp_export_fontsize %||% 11
+    .build_cbp(fsz)
+  }, height = function() cbp_height())
+  
+  # Export helpers
+  .cbp_export_dims <- function() {
+    px_w  <- input$cbp_export_width    %||% 1600
+    px_h  <- input$cbp_export_height   %||% 1200
+    dpi   <- input$cbp_export_dpi      %||% 300
+    scale <- input$cbp_export_scale    %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+  
+  output$download_cbp_png <- downloadHandler(
+    filename = function() {
+      cls <- isolate(input$cbp_class %||% "all")
+      paste0("class_barplots_", cls, "_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      dims <- isolate(.cbp_export_dims())
+      fsz  <- isolate(input$cbp_export_fontsize %||% 11)
+      p    <- isolate(.build_cbp(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      ggplot2::ggsave(file, plot = p,
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
+    }
+  )
+  
+  output$download_cbp_svg <- downloadHandler(
+    filename = function() {
+      cls <- isolate(input$cbp_class %||% "all")
+      paste0("class_barplots_", cls, "_", Sys.Date(), ".svg")
+    },
+    content = function(file) {
+      dims <- isolate(.cbp_export_dims())
+      fsz  <- isolate(input$cbp_export_fontsize %||% 11)
+      p    <- isolate(.build_cbp(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
+    }
+  )
+  
   # ========== VOLCANO PLOT ==========
   # Shared ggplot reactive — used by both renderPlotly (screen) and download handlers
   volcano_ggplot <- reactive({
@@ -6773,7 +7306,8 @@ server <- function(input, output, session) {
         colour = "Direction"
       ) +
       ggplot2::theme_minimal(base_size = 12) +
-      ggplot2::theme(panel.grid.minor = ggplot2::element_blank())
+      ggplot2::theme(panel.grid.minor = ggplot2::element_blank()) +
+      ggplot2::coord_cartesian(clip = "off")
     if (isTRUE(input$volcano_label_sig)) {
       top_n  <- input$volcano_topn_labels %||% 20
       lab_df <- res %>%
@@ -6781,10 +7315,17 @@ server <- function(input, output, session) {
         dplyr::arrange(.data[[p_col]]) %>%
         dplyr::slice_head(n = top_n)
       if (nrow(lab_df) > 0) {
-        p <- p + ggplot2::geom_text(
-          data = lab_df,
+        p <- p + ggrepel::geom_text_repel(
+          data           = lab_df,
           ggplot2::aes(label = metabolite),
-          size = 2.8, hjust = -0.1, show.legend = FALSE
+          size           = 2.8,
+          max.overlaps   = 20,
+          box.padding    = 0.35,
+          point.padding  = 0.2,
+          segment.colour = "grey60",
+          segment.size   = 0.3,
+          show.legend    = FALSE,
+          seed           = 42
         )
       }
     }
