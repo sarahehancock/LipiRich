@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.0.3-blue" alt="v0.0.3"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.0.4-blue" alt="v0.0.4"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.5.2, and Bioconductor 3.22.
 
-> ⚠️ **Pre-publication software (v0.0.3):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.0.4):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -199,9 +199,15 @@ Groups to include in the comparison are selected via the group selector on the S
 
 Multiple testing correction (FDR/BH, Bonferroni, or none) and significance threshold (α) are configurable. Post-hoc tests (Tukey HSD, pairwise t-tests with Holm correction) are available for ANOVA results.
 
+A collapsible **per-class summary panel** shows the number of species detected, tested, significant, and percentage significant for each lipid class, with a CSV download.
+
 ### Volcano plot
 
-The volcano plot displays **all tested features** regardless of the significance filter applied to the bar plots and table. Points are coloured by direction (up/down/NS) according to the configured log2FC and p-value thresholds. Significant feature labels are automatically repelled to avoid overlap, with connector lines back to their points. The plot is interactive (hover for feature details) and can be exported as PNG or SVG.
+The volcano plot displays **all tested features** regardless of the significance filter applied to the bar plots and table. Points are coloured by direction (up/down/NS) according to the configured log2FC and p-value thresholds. Significant feature labels use native plotly annotations in the interactive view and ggrepel in PNG/SVG exports. The plot is interactive (hover for feature details) and can be exported as PNG or SVG.
+
+For **ANOVA (≥ 3 groups)** results, a **Comparison** selector appears in the sidebar — select any pairwise combination to render a volcano for that specific comparison using post-hoc p-values and group-mean log2FC. Select "Overall (ANOVA)" to revert to the overall F-test result.
+
+An optional **axis capping** mode clamps the -log10(p) and log2FC axes to user-defined limits. Features beyond the cap are plotted at the cap value as filled triangles (▲), keeping the rest of the plot readable without hiding any data. True values remain accessible via hover text.
 
 ### Significance heatmap
 
@@ -307,7 +313,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2025). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.0.3). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.0.4). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 

@@ -1,7 +1,7 @@
 # app.R
 # --------------------------
-# LipiRich v0.0.3
-# Copyright (C) 2025 Sarah E. Hancock
+# LipiRich v0.0.4
+# Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@
 # GitHub:   https://github.com/sarahehancock/LipiRich
 # License:  GNU Affero General Public License v3.0 (AGPL-3.0)
 #
-# LipiRich — Copyright (C) 2025 Sarah E. Hancock
+# LipiRich — Copyright (C) 2025–2026 Sarah E. Hancock
 # This program is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.0.11
+# Version:  0.0.10
 # Tested with: MS-DIAL 5.5.251021, R 4.5.2, Bioconductor 3.22
 # --------------------------
 
-APP_VERSION <- "0.0.3"
+APP_VERSION <- "0.0.4"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -535,12 +535,22 @@ landing_page_ui <- function() {
           div(class = "workflow-card",
               div(class = "step-num", "Step 8"),
               div(class = "step-title", "Statistics"),
-              div(class = "step-desc", "Unpaired t-test, one-way ANOVA, and two-way ANOVA with multiple testing correction, post-hoc tests, volcano plot, class bar plots, and heatmap of significant features.")
+              div(class = "step-desc", "Unpaired t-test, one-way ANOVA, and two-way ANOVA with multiple testing correction, post-hoc tests, per-class significance summary, and downloadable results.")
+          ),
+          div(class = "workflow-card",
+              div(class = "step-num", "Step 8a"),
+              div(class = "step-title", "Volcano Plot"),
+              div(class = "step-desc", "Interactive volcano plot of all tested features, coloured by direction of change. Significant feature labels repelled automatically.")
           ),
           div(class = "workflow-card",
               div(class = "step-num", "Step 9"),
               div(class = "step-title", "Class Bar Plots"),
               div(class = "step-desc", "Faceted bar plots of all species within a selected lipid class, with abundance range filtering, significance highlighting, and group comparison overlays.")
+          ),
+          div(class = "workflow-card",
+              div(class = "step-num", "Step 9b"),
+              div(class = "step-title", "Heatmap"),
+              div(class = "step-desc", "Z-scored heatmap of significant features with configurable clustering, colour palettes, and row/column label toggles.")
           ),
           div(class = "workflow-card",
               div(class = "step-num", "Step 10"),
@@ -635,8 +645,8 @@ landing_page_ui <- function() {
       ),
       tags$p("If you use LipiRich in your research, please cite:"),
       div(class = "cite-box",
-          "Hancock, SE. (2025). LipiRich: A Shiny application for normalisation,
-statistics, and visualisation of MS-DIAL lipidomics data (v0.0.3).
+          "Hancock, SE. (2026). LipiRich: A Shiny application for normalisation,
+statistics, and visualisation of MS-DIAL lipidomics data (v0.0.4).
 GitHub: https://github.com/sarahehancock/LipiRich
 DOI: [pending]"
       ),
@@ -1217,6 +1227,38 @@ ui <- fluidPage(
         tabPanel("Statistics",
                  
                  h4("Step 8: Statistical tests by metabolite / class"),
+                 
+                 # ── Per-class summary panel ──────────────────────────────────
+                 tags$details(
+                   style = "margin-bottom: 12px;",
+                   tags$summary(
+                     style = paste0(
+                       "cursor:pointer; font-weight:600; font-size:0.95em;",
+                       " padding:6px 10px; background:#f0f4f8;",
+                       " border:1px solid #d0d7de; border-radius:4px;"
+                     ),
+                     "📋  Per-class detection & significance summary"
+                   ),
+                   div(
+                     style = "padding: 8px 4px 4px 4px;",
+                     fluidRow(
+                       column(6,
+                              helpText(tags$small(
+                                "Detected: species present in at least one sample after normalisation. ",
+                                "Tested: species included in the most recent statistics run. ",
+                                "Significant: passing the current α threshold."
+                              ))
+                       ),
+                       column(6, style = "text-align:right;",
+                              downloadButton("download_class_summary",
+                                             "Download summary (CSV)",
+                                             style = "font-size:0.85em; padding:3px 10px;")
+                       )
+                     ),
+                     DT::DTOutput("classStatsSummary", width = "100%")
+                   )
+                 ),
+                 
                  fluidRow(
                    column(
                      width = 8,
@@ -1389,7 +1431,7 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Volcano Plot",
-                 h4("Volcano Plot (from Statistics results)"),
+                 h4("Step 8a: Volcano Plot"),
                  fluidRow(
                    column(
                      width = 3,
@@ -1402,10 +1444,24 @@ ui <- fluidPage(
                                     value = 1, min = 0, max = 10, step = 0.25),
                        checkboxInput("volcano_use_padj",
                                      "Use adjusted p-value", value = TRUE),
+                       uiOutput("volcano_comparison_ui"),
                        checkboxInput("volcano_label_sig",
                                      "Label top significant points", value = TRUE),
                        numericInput("volcano_topn_labels",
                                     "Max labels:", value = 20, min = 0, max = 100),
+                       hr(),
+                       checkboxInput("volcano_cap_axes",
+                                     "Cap axes to reduce outlier distortion", value = FALSE),
+                       conditionalPanel(
+                         condition = "input.volcano_cap_axes == true",
+                         numericInput("volcano_cap_y",
+                                      "-log10(p) cap:",
+                                      value = 10, min = 1, max = 500, step = 1),
+                         numericInput("volcano_cap_x",
+                                      "log2FC cap (+/-):",
+                                      value = 5, min = 0.5, max = 50, step = 0.5),
+                         helpText(tags$small("Features beyond the cap are plotted at the cap value as triangles \u25b2."))
+                       ),
                        helpText("Run Statistics first to populate this plot."),
                        hr(),
                        h5("Export plot"),
@@ -1690,7 +1746,7 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Correlation Network",
-                 h4("Lipid Correlation Network"),
+                 h4("Step 11: Correlation Network"),
                  fluidRow(
                    column(
                      width = 3,
@@ -4509,6 +4565,87 @@ server <- function(input, output, session) {
     datatable(ph, options = list(scrollX = TRUE), rownames = FALSE)
   })
   
+  # ---- Per-class detection & significance summary ----
+  class_stats_summary <- reactive({
+    # Detected: all species in bg_norm_long_resolved (IS excluded)
+    df_all <- tryCatch(bg_norm_long_resolved(), error = function(e) NULL)
+    if (is.null(df_all)) return(NULL)
+    detected <- df_all %>%
+      dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
+      dplyr::distinct(`Metabolite name`, plot_class) %>%
+      dplyr::count(plot_class, name = "Detected")
+    
+    # Tested & significant: from stats_results_all / stats_results_val
+    tested_df  <- stats_results_all()
+    sig_df     <- stats_results_val()
+    alpha      <- input$alpha %||% 0.05
+    use_adj    <- isTRUE(input$use_adj_threshold) &&
+      !identical(input$padj_method %||% "BH", "none")
+    
+    tested <- if (!is.null(tested_df) && nrow(tested_df) > 0)
+      tested_df %>% dplyr::count(plot_class, name = "Tested")
+    else
+      tibble::tibble(plot_class = character(0), Tested = integer(0))
+    
+    sig <- if (!is.null(sig_df) && nrow(sig_df) > 0) {
+      p_col <- if (use_adj && "p_adj" %in% names(sig_df)) "p_adj" else "p"
+      sig_df %>%
+        dplyr::filter(!is.na(.data[[p_col]]), .data[[p_col]] < alpha) %>%
+        dplyr::count(plot_class, name = "Significant")
+    } else {
+      tibble::tibble(plot_class = character(0), Significant = integer(0))
+    }
+    
+    out <- detected %>%
+      dplyr::left_join(tested,  by = "plot_class") %>%
+      dplyr::left_join(sig,     by = "plot_class") %>%
+      dplyr::mutate(
+        Tested      = tidyr::replace_na(Tested,      0L),
+        Significant = tidyr::replace_na(Significant, 0L),
+        `% significant` = dplyr::if_else(
+          Tested > 0,
+          paste0(round(Significant / Tested * 100, 1), "%"),
+          "—"
+        )
+      ) %>%
+      dplyr::arrange(plot_class) %>%
+      dplyr::rename(Class = plot_class)
+    
+    out
+  })
+  
+  output$classStatsSummary <- DT::renderDT({
+    df <- class_stats_summary()
+    validate(need(!is.null(df) && nrow(df) > 0,
+                  "Load data to see the per-class summary."))
+    DT::datatable(
+      df,
+      rownames  = FALSE,
+      selection = "none",
+      options   = list(
+        dom        = "t",
+        pageLength = nrow(df),
+        scrollX    = TRUE,
+        columnDefs = list(list(className = "dt-center",
+                               targets   = 1:4))
+      ),
+      class = "stripe hover compact"
+    ) %>%
+      DT::formatStyle(
+        "Significant",
+        backgroundColor = DT::styleInterval(0, c("white", "#d4edda"))
+      )
+  })
+  
+  output$download_class_summary <- downloadHandler(
+    filename = function() paste0("LipiRich_class_summary_", Sys.Date(), ".csv"),
+    content  = function(file) {
+      df <- class_stats_summary()
+      validate(need(!is.null(df), "No data to export."))
+      readr::write_csv(df, file)
+    }
+  )
+  
   # ---- Bar plot data for significant features ----
   stats_sig_plot_data <- reactive({
     res <- stats_results_val()
@@ -4583,7 +4720,7 @@ server <- function(input, output, session) {
   # p.adj.signif — or NULL if nothing significant.
   .compute_pairwise <- function(df_long, group_col = "bar_group",
                                 padj_method = "BH", alpha = 0.05,
-                                use_adj = TRUE) {
+                                use_adj = TRUE, filter_alpha = alpha) {
     normalize_pcols <- function(x) {
       nm <- names(x)
       if ("adj.p.value" %in% nm && !"p.adj" %in% nm) x <- dplyr::rename(x, p.adj = `adj.p.value`)
@@ -4672,7 +4809,7 @@ server <- function(input, output, session) {
       if (is.null(comps) || nrow(comps) == 0) next
       p_col <- if (use_adj && "p.adj" %in% names(comps)) "p.adj" else "p"
       comps <- comps %>%
-        dplyr::filter(.data[[p_col]] < alpha) %>%
+        dplyr::filter(.data[[p_col]] < filter_alpha) %>%
         dplyr::mutate(`Metabolite name` = met)
       if (nrow(comps) > 0) ann_list[[length(ann_list) + 1]] <- comps
     }
@@ -7265,14 +7402,130 @@ server <- function(input, output, session) {
   
   # ========== VOLCANO PLOT ==========
   # Shared ggplot reactive — used by both renderPlotly (screen) and download handlers
-  volcano_ggplot <- reactive({
-    res <- stats_results_all()  # always use full unfiltered results
-    if (is.null(res) || nrow(res) == 0 || !"log2FC" %in% names(res)) return(NULL)
+  # Populate comparison selector — only shown for ANOVA results
+  output$volcano_comparison_ui <- renderUI({
+    res <- stats_results_all()
+    if (is.null(res) || nrow(res) == 0) return(NULL)
+    is_anova <- any(res$test %in% c("oneway", "twoway"), na.rm = TRUE)
+    if (!is_anova) return(NULL)
+    
+    ph <- tryCatch(posthoc_for_plot(), error = function(e) NULL)
+    if (is.null(ph) || nrow(ph) == 0) {
+      return(helpText(tags$small(
+        tags$b("ANOVA results detected."),
+        " Run post-hoc tests on the Statistics tab to enable pairwise volcano plots."
+      )))
+    }
+    
+    pairs <- ph %>%
+      dplyr::mutate(pair = paste(group1, "vs", group2)) %>%
+      dplyr::distinct(pair) %>%
+      dplyr::pull(pair)
+    
+    tagList(
+      selectInput("volcano_comparison",
+                  "Pairwise comparison (ANOVA):",
+                  choices  = c("Overall (ANOVA p-value)" = "overall", pairs),
+                  selected = pairs[1])
+    )
+  })
+  
+  # Helper: build plot data for a specific pairwise comparison
+  # Uses all tested features (filter_alpha = Inf) so the volcano shows
+  # non-significant points too, not just those that passed posthoc filtering.
+  .volcano_pairwise_data <- function(pair_str) {
+    df_long <- tryCatch(stats_input_long(), error = function(e) NULL)
+    if (is.null(df_long)) return(NULL)
+    
+    parts <- strsplit(pair_str, " vs ")[[1]]
+    g1    <- trimws(parts[1])
+    g2    <- trimws(parts[2])
+    
+    df_pair <- df_long %>%
+      dplyr::filter(group %in% c(g1, g2))
+    if (nrow(df_pair) == 0) return(NULL)
+    
+    # Compute group means and log2FC for every feature
+    means <- df_pair %>%
+      dplyr::group_by(`Metabolite name`, plot_class, group) %>%
+      dplyr::summarise(mean_val = mean(value, na.rm = TRUE), .groups = "drop") %>%
+      tidyr::pivot_wider(names_from = group, values_from = mean_val)
+    
+    if (!all(c(g1, g2) %in% names(means))) return(NULL)
+    
+    means <- means %>%
+      dplyr::mutate(
+        log2FC = log2(((.data[[g1]] + 1e-12) / (.data[[g2]] + 1e-12)))
+      ) %>%
+      dplyr::rename(metabolite = `Metabolite name`)
+    
+    # Pairwise stats for ALL features — no significance filter
+    df_feats <- df_pair %>%
+      dplyr::rename(bar_group = group) %>%
+      dplyr::select(`Metabolite name`, bar_group, value)
+    
+    ph_all <- tryCatch(
+      .compute_pairwise(
+        df_long     = df_feats,
+        group_col   = "bar_group",
+        padj_method = input$padj_method %||% "BH",
+        alpha       = input$alpha       %||% 0.05,
+        use_adj     = isTRUE(input$use_adj_threshold) &&
+          !identical(input$padj_method %||% "BH", "none"),
+        filter_alpha = Inf   # return all features, not just significant
+      ),
+      error = function(e) NULL
+    )
+    if (is.null(ph_all) || nrow(ph_all) == 0) return(NULL)
+    
+    ph_pair <- ph_all %>%
+      dplyr::filter(
+        (as.character(group1) == g1 & as.character(group2) == g2) |
+          (as.character(group1) == g2 & as.character(group2) == g1)
+      ) %>%
+      dplyr::mutate(metabolite = as.character(`Metabolite name`)) %>%
+      dplyr::select(metabolite, p, p.adj, p.adj.signif)
+    
+    if (nrow(ph_pair) == 0) return(NULL)
+    
+    means %>%
+      dplyr::inner_join(ph_pair, by = "metabolite") %>%
+      dplyr::select(metabolite, plot_class, log2FC, p, p.adj)
+  }
+  
+  # Core volcano plot builder — called by both the reactive and export handlers.
+  # add_repel_labels = TRUE  → ggrepel labels (for PNG/SVG export)
+  # add_repel_labels = FALSE → no label layer (for plotly; annotations added separately)
+  .build_volcano_ggplot <- function(add_repel_labels = TRUE) {
+    res    <- stats_results_all()
+    if (is.null(res) || nrow(res) == 0) return(NULL)
     alpha  <- input$volcano_alpha  %||% 0.05
     fc_thr <- input$volcano_log2fc %||% 1
-    p_col  <- if (isTRUE(input$volcano_use_padj) &&
-                  "p_adj" %in% names(res)) "p_adj" else "p"
-    res <- res %>%
+    use_adj <- isTRUE(input$volcano_use_padj)
+    
+    # Determine if we should use pairwise mode
+    is_anova  <- any(res$test %in% c("oneway", "twoway"), na.rm = TRUE)
+    pair_sel  <- input$volcano_comparison %||% "overall"
+    use_pair  <- is_anova && !identical(pair_sel, "overall") && nzchar(pair_sel)
+    
+    if (use_pair) {
+      plot_df <- .volcano_pairwise_data(pair_sel)
+      validate(need(!is.null(plot_df) && nrow(plot_df) > 0,
+                    "No pairwise data for this comparison. Run post-hoc tests on the Statistics tab."))
+      p_col    <- if (use_adj && "p.adj" %in% names(plot_df)) "p.adj" else "p"
+      subtitle <- paste0("Comparison: ", pair_sel)
+    } else {
+      if (!"log2FC" %in% names(res)) {
+        validate(need(FALSE,
+                      "Volcano plot requires log2FC — only available for 2-group (t-test) results. ",
+                      "Select a pairwise comparison above for ANOVA data."))
+      }
+      plot_df  <- res
+      p_col    <- if (use_adj && "p_adj" %in% names(plot_df)) "p_adj" else "p"
+      subtitle <- NULL
+    }
+    
+    plot_df <- plot_df %>%
       dplyr::mutate(
         neg_log10_p = -log10(pmax(.data[[p_col]], 1e-300)),
         direction   = dplyr::case_when(
@@ -7280,19 +7533,48 @@ server <- function(input, output, session) {
           .data[[p_col]] < alpha & log2FC < -fc_thr ~ "Down",
           TRUE ~ "NS"
         ),
-        hover_text  = paste0(
+        hover_text = paste0(
           "Feature: ", metabolite,
           "\nClass: ", plot_class,
           "\nlog2FC: ", round(log2FC, 3),
           "\n", p_col, ": ", signif(.data[[p_col]], 3)
         )
       )
+    
+    # --- Axis capping ---
+    # When enabled, features beyond the cap are plotted AT the cap with a
+    # triangle marker so the compressed region remains readable while no
+    # data are hidden. The original values are preserved in hover_text.
+    cap_axes <- isTRUE(input$volcano_cap_axes)
+    cap_y    <- if (cap_axes) (input$volcano_cap_y %||% 10)  else Inf
+    cap_x    <- if (cap_axes) (input$volcano_cap_x %||% 5)   else Inf
+    
+    plot_df <- plot_df %>%
+      dplyr::mutate(
+        capped = cap_axes & (neg_log10_p > cap_y | abs(log2FC) > cap_x),
+        # Append capping note to hover text for capped points
+        hover_text = dplyr::if_else(
+          capped,
+          paste0(hover_text, "\n[axis-capped for display]"),
+          hover_text
+        ),
+        neg_log10_p = pmin(neg_log10_p, cap_y),
+        log2FC      = pmax(pmin(log2FC,  cap_x), -cap_x),
+        pt_shape    = dplyr::if_else(capped, "capped", "normal")
+      )
+    
+    shape_vals <- c(normal = 16, capped = 17)  # circle / filled triangle
+    
     p <- ggplot2::ggplot(
-      res,
+      plot_df,
       ggplot2::aes(x = log2FC, y = neg_log10_p,
-                   colour = direction, text = hover_text)
+                   colour = direction, shape = pt_shape, text = hover_text)
     ) +
       ggplot2::geom_point(alpha = 0.7, size = 1.8) +
+      ggplot2::scale_shape_manual(
+        values = shape_vals,
+        guide  = if (cap_axes) ggplot2::guide_legend(title = NULL) else "none"
+      ) +
       ggplot2::geom_vline(xintercept = c(-fc_thr, fc_thr),
                           linetype = "dashed", colour = "#888888") +
       ggplot2::geom_hline(yintercept = -log10(alpha),
@@ -7301,41 +7583,111 @@ server <- function(input, output, session) {
         values = c(Up = "#E45756", Down = "#4C78A8", NS = "#AAAAAA")
       ) +
       ggplot2::labs(
-        x      = "log2 Fold Change",
-        y      = paste0("-log10(", p_col, ")"),
-        colour = "Direction"
+        x        = "log2 Fold Change",
+        y        = paste0("-log10(", p_col, ")"),
+        colour   = "Direction",
+        subtitle = subtitle
       ) +
       ggplot2::theme_minimal(base_size = 12) +
       ggplot2::theme(panel.grid.minor = ggplot2::element_blank()) +
       ggplot2::coord_cartesian(clip = "off")
-    if (isTRUE(input$volcano_label_sig)) {
+    
+    if (isTRUE(input$volcano_label_sig) && add_repel_labels) {
       top_n  <- input$volcano_topn_labels %||% 20
-      lab_df <- res %>%
+      lab_df <- plot_df %>%
         dplyr::filter(direction != "NS") %>%
         dplyr::arrange(.data[[p_col]]) %>%
         dplyr::slice_head(n = top_n)
       if (nrow(lab_df) > 0) {
+        # Expand plot limits to give ggrepel room to place labels without
+        # clipping. When axis capping is active, use the cap as the boundary
+        # so labels don't try to position themselves beyond the cap line.
+        x_range <- range(plot_df$log2FC,      na.rm = TRUE)
+        y_range <- range(plot_df$neg_log10_p, na.rm = TRUE)
+        x_max   <- if (cap_axes) cap_x  else x_range[2]
+        x_min   <- if (cap_axes) -cap_x else x_range[1]
+        y_max   <- if (cap_axes) cap_y  else y_range[2]
+        x_pad   <- diff(c(x_min, x_max)) * 0.15
+        y_pad   <- diff(c(y_range[1], y_max)) * 0.15
+        
         p <- p + ggrepel::geom_text_repel(
           data           = lab_df,
           ggplot2::aes(label = metabolite),
           size           = 2.8,
-          max.overlaps   = 20,
-          box.padding    = 0.35,
-          point.padding  = 0.2,
+          max.overlaps   = Inf,       # never silently drop labels
+          box.padding    = 0.4,
+          point.padding  = 0.3,
+          force          = 2,
+          force_pull     = 0.5,
+          direction      = "both",
           segment.colour = "grey60",
           segment.size   = 0.3,
+          segment.curvature = 0.1,
           show.legend    = FALSE,
-          seed           = 42
+          seed           = 42,
+          xlim           = c(x_min - x_pad, x_max + x_pad),
+          ylim           = c(y_range[1],    y_max + y_pad)
         )
       }
     }
+    
+    # Attach plot_df and p_col as attributes so renderPlotly can add annotations
+    attr(p, "plot_df") <- plot_df
+    attr(p, "p_col")   <- p_col
     p
+  }
+  
+  volcano_ggplot <- reactive({
+    .build_volcano_ggplot(add_repel_labels = TRUE)
   })
   
   output$volcanoPlot <- renderPlotly({
-    p <- volcano_ggplot()
+    # Build base plot without ggrepel (not supported by plotly)
+    p <- .build_volcano_ggplot(add_repel_labels = FALSE)
     validate(need(!is.null(p), "Run statistics first (click Run statistics button)."))
-    plotly::ggplotly(p, tooltip = "text")
+    
+    pl <- plotly::ggplotly(p, tooltip = "text")
+    
+    # Add plotly-native text annotations for top-N significant features
+    if (isTRUE(input$volcano_label_sig)) {
+      plot_df <- attr(p, "plot_df")
+      p_col   <- attr(p, "p_col")
+      top_n   <- input$volcano_topn_labels %||% 20
+      
+      if (!is.null(plot_df) && !is.null(p_col)) {
+        lab_df <- plot_df %>%
+          dplyr::filter(direction != "NS") %>%
+          dplyr::arrange(.data[[p_col]]) %>%
+          dplyr::slice_head(n = top_n)
+        
+        if (nrow(lab_df) > 0) {
+          # Fan arrow offsets so labels spread out rather than all pointing the
+          # same direction — prevents off-screen clipping near plot edges.
+          n_lab   <- nrow(lab_df)
+          angles  <- seq(0, 2 * pi, length.out = n_lab + 1)[seq_len(n_lab)]
+          ax_vals <- round(cos(angles) * 40)
+          ay_vals <- round(sin(angles) * -40)  # negative = up in plotly coords
+          
+          pl <- pl %>%
+            plotly::add_annotations(
+              x          = lab_df$log2FC,
+              y          = lab_df$neg_log10_p,
+              text       = lab_df$metabolite,
+              xref       = "x", yref = "y",
+              showarrow  = TRUE,
+              arrowhead  = 2,
+              arrowsize  = 0.5,
+              arrowcolor = "grey60",
+              ax         = ax_vals,
+              ay         = ay_vals,
+              font       = list(size = 9),
+              bgcolor    = "rgba(255,255,255,0.7)",
+              borderpad  = 2
+            )
+        }
+      }
+    }
+    pl
   })
   
   

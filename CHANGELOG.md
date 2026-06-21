@@ -4,6 +4,54 @@
 
 ---
 
+## [0.0.4] — 2026-06-21
+
+### New features
+
+#### Volcano plot — pairwise comparisons for ANOVA data
+When the Statistics tab has run a one-way ANOVA (≥ 3 groups), a **Comparison** selector now appears in the Volcano Plot sidebar. Available pairwise comparisons are populated from `posthoc_for_plot()`. Selecting a comparison computes the pairwise log2FC from group means and the pairwise adjusted p-value via `.compute_pairwise`, then renders a standard volcano for that pair. The plot subtitle shows the active comparison. When "Overall (ANOVA)" is selected, the behaviour reverts to the existing overall F-test volcano (for datasets where log2FC is available).
+
+#### Volcano plot — axis capping for outlier control
+A new **Cap axes to reduce outlier distortion** checkbox (off by default) allows the -log10(p) and log2FC axes to be clamped to user-defined limits. Features beyond the cap are plotted *at* the cap value as filled triangles (▲) rather than being hidden or causing axis compression that makes the remainder of the plot unreadable. Hover text for capped points is annotated with `[axis-capped for display]` so the true values remain accessible interactively. The shape legend (circle = normal, triangle = capped) only appears when capping is active.
+
+#### Volcano plot — improved label rendering
+Labels for significant features are now rendered differently for the interactive and export contexts:
+
+- **Interactive (plotly):** ggrepel is not supported by plotly's ggplot converter and was silently dropped. Labels are now added as native plotly annotations via `add_annotations()`, with arrow offsets fanned radially so labels near plot edges are not pushed off-screen.
+- **PNG/SVG export:** ggrepel labels are retained for static export with `max.overlaps = Inf` (labels are never silently dropped), expanded `xlim`/`ylim` boundaries to give the repulsion algorithm room to place labels near plot edges, and increased `force` and `force_pull` values. When axis capping is active, ggrepel boundaries respect the cap limits.
+
+#### Statistics tab — per-class detection and significance summary panel
+A collapsible `<details>` panel has been added to the Statistics tab showing a summary table of results broken down by lipid class. For each class the table reports: number of species detected, number tested, number significant, and percentage significant. The full table is downloadable as CSV.
+
+---
+
+### Bug fixes
+
+#### Volcano plot — t-test data crashing with `p_adj` not found
+The `volcano_ggplot` reactive was setting `p_col = "p_adj"` then immediately renaming the column to `p.adj`, leaving `p_col` pointing to a non-existent column. The rename has been removed; the t-test path now uses `p_adj` consistently throughout.
+
+#### Volcano plot — pairwise view showed only significant features
+`.volcano_pairwise_data` was sourcing p-values from `posthoc_for_plot()`, which internally filters to `p < alpha` before returning. Features that did not pass the significance threshold had no matching row to join to and were silently dropped. Fixed by adding a `filter_alpha` parameter to `.compute_pairwise` (default `= alpha` preserves existing behaviour for all other callers; pass `Inf` to bypass the filter). `.volcano_pairwise_data` now calls `.compute_pairwise` directly on `stats_input_long()` with `filter_alpha = Inf`, independently of `posthoc_for_plot()`.
+
+---
+
+### Improvements
+
+#### Tab step headings corrected
+All tab `h4` step headings updated to reflect the current step numbering: Volcano Plot is now labelled **Step 8a** and Correlation Network is labelled **Step 11**.
+
+#### Landing page updated with Step 8a and Step 9b cards
+The landing page feature cards now include entries for **Step 8a — Volcano Plot** and **Step 9b — Heatmap (significant features)**, which were previously missing.
+
+---
+
+### Other
+
+#### Copyright year updated to 2025–2026
+File header, AGPL licence block, and citation text updated to reflect the 2026 release year.
+
+---
+
 ## [0.0.3] — 2026-06-06
 
 ### New features
@@ -74,8 +122,6 @@ Step 9 is now Class Bar Plots; previous steps 9–11 renumbered to 10–12.
 
 #### Plot export controls standardised
 All visualisation tabs (Statistics bar plots, Volcano, Heatmap, Enrichment, Synthesis Pathways, Class Bar Plots) now use consistent Width (px) / Height (px) / DPI / Scale fraction / Base font size controls with PNG + SVG buttons.
-
----
 
 ---
 
