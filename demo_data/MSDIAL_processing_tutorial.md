@@ -158,18 +158,18 @@ An example of an incorrect identification of CL 69:5 can be seen in the screensh
 
 ### Other common issues
 
-Isomeric TG peaks are often detected as poorly resolved. MS-DIAL usually does a reasonable job deconvoluting them, but manual peak selection is sometimes required. The Annotation listed in the Sample table can help determine which peak belongs to which species. In the example below, three isomeric TG species are poorly resolved: TG 14:0_16:0_22:6 (1), TG 16:0_16:1_20:5 (2), and TG 16:1_18:2_18:3 (3). Inspection of the annotation for each chromatogram shows peak (1) is the last peak, peak (2) is the middle peak, and peak (3) is the first peak.
+Isomeric TG peaks are often detected as poorly resolved. MS-DIAL usually does a reasonable job deconvoluting them, but manual peak selection is sometimes required. The Annotation listed in the Sample table can help determine which peak belongs to which species. In the example below, three isomeric TG species are poorly resolved: TG 14:0_16:0_22:6 (1), TG 16:0_16:1_20:5 (2), and TG 16:1_18:2_18:3 (3). Inspection of the annotation for each chromatogram shows species (1) is the last peak, species (2) is the middle peak, and species (3) is the first peak.
 
-Peak (1):
+Species (1):
 ![peak1.png](images/peak1.png)
 
-Peak (2):
+Species (2):
 ![peak2.png](images/peak2.png)
 
-Peak (3):
+Species (3):
 ![peak3.png](images/peak3.png)
 
-Sample outliers can also affect the ability to correctly align peaks. Samples can be "turned off" post-alignment using "File property setting" under the "Option" tab.
+Sample outliers can also affect the ability to align peaks correctly. Samples can be "turned off" post-alignment using "File property setting" under the "Option" tab.
 
 ![file property setting.png](<images/file property setting.png>)
 
