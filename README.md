@@ -347,7 +347,7 @@ A full demonstration dataset is available in [`demo_data/`](demo_data/), generat
 | `Demo data neg.txt` | MS-DIAL 5 aligned output, negative ion mode |
 | `Demo data metadata.xlsx` | Combined reference workbook: sample order/analytical run order, protein content, and internal standard amounts (three sheets) |
 | `Demo data protein.csv` | Protein content per sample, formatted for direct upload to LipiRich's protein normalisation step |
-| `Demo data  ISTD_amounts.csv` | Internal standard amounts, formatted for direct upload to LipiRich |
+| `Demo data_ISTD_amounts.csv` | Internal standard amounts, formatted for direct upload to LipiRich |
 | `Processing parameters pos.mdparameter` | MS-DIAL 5 processing parameters used to generate `Demo data pos.txt` |
 | `Processing parameters neg.mdparameter` | MS-DIAL 5 processing parameters used to generate `Demo data neg.txt` |
 
@@ -375,7 +375,7 @@ LipiRich/
     ├── Demo data neg.txt
     ├── Demo data metadata.xlsx
     ├── Demo data protein.csv
-    ├── Demo data ISTD_amounts.csv
+    ├── Demo data_ISTD_amounts.csv
     ├── Processing parameters pos.mdparameter
     └── Processing parameters neg.mdparameter
 ```
