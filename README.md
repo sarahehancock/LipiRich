@@ -90,9 +90,9 @@ LipiRich accepts the aligned output exported from MS-DIAL 5 as a tab-delimited `
 
 ### Step 1 — Run alignment and curate features
 
-Complete peak picking and alignment in MS-DIAL 5 as normal. Review your alignment result and tag correctly identified lipid species with the **✓ checkmark** in MS-DIAL, then select **Filter by current parameter** during alignment export to include only checked features. This is the recommended way to control which species are passed to LipiRich for analysis.
+Complete peak picking and alignment in MS-DIAL 5 as normal. Review your alignment result and tag correctly identified lipid species with the **✓ checkmark** in the Peak spot table. Select Tag filter by **✓ checkmark** in the Peak spot table, then select **Filter by current parameter** during alignment export to include only checked features. This is the recommended way to control which species are passed to LipiRich for analysis.
 
-> **Note:** If you do not filter by current parameter on export, all aligned features will appear in the output file and LipiRich will process them all.
+> **Note:** If you do not filter by Tag filter **✓ checkmark** in the Peak spot table and by current parameter on export, all aligned features will appear in the output file and LipiRich will process them all.
 
 ### Step 2 — Export aligned data
 
@@ -339,24 +339,24 @@ PNG and SVG formats are available on all plot tabs. The Statistics tab additiona
 
 ## Demo Data
 
-A full demonstration dataset is available in [`demo_data/`](demo_data/), generated from mouse liver samples (n = 8 per group: chow, lard-based high-fat diet, and 90% fish oil high-fat diet). Animal and diet details are as previously described (Liu et al. 2014, *Scientific Reports* 4:5538).
+A full demonstration dataset is available in [`demo_data/`](demo_data/), generated from mouse liver samples (n = 8 per group: chow, lard-based high-fat diet, and 90% fish oil high-fat diet). Animal and diet details are as previously described (Liu et al. 2014, *Scientific Reports* 4:5538). Lipid extraction and LC-MS data acquisition are described in the Zenodo repository for `.raw` files (see below).
 
 | File | Description |
 |---|---|
-| `liver_pos.txt` | MS-DIAL 5 aligned output, positive ion mode |
-| `liver_neg.txt` | MS-DIAL 5 aligned output, negative ion mode |
-| `liver_metadata.xlsx` | Combined reference workbook: sample order/analytical run order, protein content, and internal standard amounts (three sheets) |
-| `liver_protein.csv` | Protein content per sample, formatted for direct upload to LipiRich's protein normalisation step |
-| `liver_ISTD_amounts.csv` | Internal standard amounts, formatted for direct upload to LipiRich |
-| `liver_MSDIAL_processing_parameters_pos.mdparameter` | MS-DIAL 5 processing parameters used to generate `liver_pos.txt` |
-| `liver_MSDIAL_processing_parameters_neg.mdparameter` | MS-DIAL 5 processing parameters used to generate `liver_neg.txt` |
+| `Demo data pos.txt` | MS-DIAL 5 aligned output, positive ion mode |
+| `Demo data neg.txt` | MS-DIAL 5 aligned output, negative ion mode |
+| `Demo data metadata.xlsx` | Combined reference workbook: sample order/analytical run order, protein content, and internal standard amounts (three sheets) |
+| `Demo data protein.csv` | Protein content per sample, formatted for direct upload to LipiRich's protein normalisation step |
+| `Demo data  ISTD_amounts.csv` | Internal standard amounts, formatted for direct upload to LipiRich |
+| `Processing parameters pos.mdparameter` | MS-DIAL 5 processing parameters used to generate `Demo data pos.txt` |
+| `Processing parameters neg.mdparameter` | MS-DIAL 5 processing parameters used to generate `Demo data neg.txt` |
 
-To try LipiRich immediately, upload `liver_pos.txt` and `liver_neg.txt` directly (Step 1), then `liver_protein.csv` and `liver_ISTD_amounts.csv` at the relevant normalisation steps.
+To try LipiRich immediately, upload `Demo data pos.txt` and `Demo data neg.txt` directly (Step 1), then `Demo data protein.csv` and `Demo data ISTD_amounts.csv` at the relevant normalisation steps.
 
 **Raw instrument data:** The original LC-MS `.raw` files from which the above were generated in MS-DIAL 5 are archived separately due to size:
 - DOI: [10.5281/zenodo.21448733](https://doi.org/10.5281/zenodo.21448733)
 
-The `.mdparameter` files above can be used to reproduce the exact MS-DIAL 5 alignment from these raw files.
+The `.mdparameter` files above can be used to reproduce the exact MS-DIAL 5 alignment from these raw files. 
 
 ---
 
@@ -371,13 +371,13 @@ LipiRich/
 ├── CHANGELOG.md     # Version history
 ├── LICENSE          # GNU Affero General Public License v3.0
 └── demo_data/       # Example input files
-    ├── liver_pos.txt
-    ├── liver_neg.txt
-    ├── liver_metadata.xlsx
-    ├── liver_protein.csv
-    ├── liver_ISTD_amounts.csv
-    ├── liver_MSDIAL_processing_parameters_pos.mdparameter
-    └── liver_MSDIAL_processing_parameters_neg.mdparameter
+    ├── Demo data pos.txt
+    ├── Demo data neg.txt
+    ├── Demo data metadata.xlsx
+    ├── Demo data protein.csv
+    ├── Demo data ISTD_amounts.csv
+    ├── Processing parameters pos.mdparameter
+    └── Processing parameters neg.mdparameter
 ```
 
 ---
