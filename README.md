@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.0.4-blue" alt="v0.0.4"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="v0.1.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.5.2, and Bioconductor 3.22.
 
-> ⚠️ **Pre-publication software (v0.0.4):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.1.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -15,10 +15,12 @@
 | **Data import** | Upload 1–2 MS-DIAL aligned `.txt` files; positive and negative ion modes merged automatically |
 | **Ion mode deduplication** | Per-class mode preference rules (user-configurable) ensure each species is represented by its most informative ion mode |
 | **Internal standards** | QC plots and per-ISTD quantification; IS matched by class, ion mode, and adduct type |
-| **Normalisation** | Blank subtraction followed by IS-based quantitative normalisation |
+| **Normalisation** | Blank subtraction followed by IS-based quantitative normalisation, with optional protein normalisation |
+| **Protein Match** | Diagnostic check confirming every imported sample has a matching protein CSV entry (and vice versa), before relying on protein normalisation |
+| **Outlier Detection** | Sample-level (PCA Hotelling's T², iQC replicate deviation) and feature-level (modified Z-score / IQR) outlier flagging, with bulk and individual exclusion that propagates to every downstream tab |
 | **Visualisation** | Interactive bar plots per lipid species and per class, with adduct-type filtering |
 | **Export** | Wide and long-format CSV export with class and unit filtering |
-| **PCA** | Principal component analysis with token-based group colouring and sample selection |
+| **PCA** | Principal component analysis with token-based group colouring, sample selection, and iQC/ISTD projected as supplementary (non-fit-influencing) points |
 | **Statistics** | Auto t-test / one-way ANOVA / two-way ANOVA with post-hoc tests, volcano plot, and significance heatmap |
 | **Class Bar Plots** | Faceted bar plots of all species within a selected lipid class post-statistics, with abundance range filtering and significance highlighting |
 | **Enrichment** | ORA and FGSEA across lipid class, fatty acid identity, saturation, chain length, and ether subclass sets |
@@ -161,7 +163,7 @@ To assign groups explicitly — particularly useful for complex experimental des
 | `factorA` | No | Factor A label for two-way ANOVA designs |
 | `factorB` | No | Factor B label for two-way ANOVA designs |
 
-When a grouping CSV is uploaded and enabled, it takes priority over token-based grouping across all tabs. Blank samples and iQC samples are automatically excluded from group selectors regardless of method.
+When a grouping CSV is uploaded and enabled, it takes priority over token-based grouping across all tabs. Blank, iQC, and ISTD-named samples are automatically excluded from group selectors regardless of method.
 
 ---
 
@@ -184,6 +186,58 @@ Upload a CSV with exactly three columns to specify different amounts and units p
 IS are matched to analytes by class, ion mode, and adduct type. If an ISTD CSV provides entries with different adducts for the same class (e.g. `[M-H]-` and `[M+NH4]+`), each matching adduct produces a separate normalised value in the output, which can then be filtered using the adduct filter on the plot tabs.
 
 If an analyte's IS cannot be matched via the CSV, LipiRich falls back to the single global ISTD amount entered in the sidebar.
+
+---
+
+## Protein Normalisation & Protein Match
+
+Optionally, normalise IS-normalised or background-subtracted values by per-sample protein content, in addition to (not instead of) internal standard normalisation. Upload a CSV with exactly two columns:
+
+| Column | Description |
+|---|---|
+| `sample` | Sample name matched (trimmed) to the MS-DIAL sample name, ignoring the `_pos`/`_neg` suffix |
+| `protein` | Numeric protein content per sample |
+
+Enable **Apply protein normalisation** in the sidebar to divide `norm`/`value_bs` by each sample's protein value. Samples with no matching protein CSV row are left un-normalised rather than dropped.
+
+### Protein Match tab (Step 3a)
+
+Before relying on protein normalisation, the **Protein Match** tab reports whether every imported sample has a matching protein CSV row, and flags any protein CSV rows that don't correspond to an imported sample — a common sign of a typo in one file or the other. ISTD, Blank, and iQC/QC samples are excluded from this check on both sides, since they are not expected to have protein measurements.
+
+---
+
+## Outlier Detection (Step 3b)
+
+A combined sample-level and feature-level outlier workflow sits upstream of all visualisation and statistics tabs, so any exclusion applies consistently everywhere downstream.
+
+**Sample-level:**
+- **PCA Hotelling's T²** — a self-contained PCA (log-transformed, unit-variance scaled) flags samples beyond a user-selected confidence threshold (95/97.5/99%).
+- **iQC replicate deviation** — for datasets with ≥ 3 iQC replicates, flags iQC samples whose deviation from the cross-replicate median exceeds a MAD-based threshold. This check is informational only; iQC samples are never excluded from downstream analyses regardless of the result.
+
+**Feature-level:** flags individual sample values within a Metabolite name × group combination using a modified Z-score (MAD) or the classic IQR rule, both with adjustable thresholds.
+
+**Exclusion:** bulk toggles (off by default) exclude every auto-flagged sample/point. Independently, selectable review tables allow specific samples or points to be individually excluded or kept, taking precedence over the bulk toggles. Excluded feature values are set to missing rather than deleted; excluded samples are removed only from the shared in-app dataset, never from the uploaded file.
+
+ISTD, Blank, and iQC/QC samples are excluded from the entire workflow — none of them can be flagged or excluded, since they are not biological replicates.
+
+---
+
+## PCA
+
+Principal component analysis on IS-normalised or background-subtracted values, with token-based group colouring and per-group sample selection.
+
+### iQC and ISTD as supplementary (projected) points
+
+The PCA fit — axes, loadings, and centring/scaling statistics — is computed from biological samples only. If included, iQC and ISTD-only samples are projected into the fitted space afterward as supplementary individuals (via FactoMineR's `ind.sup`), so neither can distort the ordination:
+
+- **Include iQC samples** — on by default.
+- **Include ISTD-only samples** — off by default. An ISTD-only injection has no biological matrix and a very different lipid profile to a real sample, so it is excluded unless explicitly requested.
+
+Since neither type is typically present in the protein CSV, when protein normalisation is active they are scaled by the *median* protein content of the biological samples purely so the projection lands somewhere visually comparable — this is an assumed, not measured, value. The plot legend distinguishes real groups, iQC, and ISTD by colour; supplementary points are shown as triangles, active points as circles.
+
+### Export and labels
+
+Standard Width/Height/DPI/Scale/Base font size export controls with PNG/SVG buttons, plus a **Show sample ID labels** toggle (off by default).
 
 ---
 
@@ -313,7 +367,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.0.4). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.1.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 

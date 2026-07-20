@@ -4,6 +4,47 @@
 
 ---
 
+## [0.1.0] — 2026-07-20
+
+### New features
+
+#### Protein Match tab (Step 3a)
+A new diagnostic tab checks whether every imported MS-DIAL sample has a corresponding row in the uploaded protein content CSV, matched on the same normalised sample name used by the actual protein-normalisation join (`_pos`/`_neg` suffix stripped, trimmed, lower-cased). Reports which samples matched, which are missing a protein value (and so will *not* be protein-normalised), and which protein CSV rows don't correspond to any imported sample (a common sign of a typo). ISTD, Blank, and iQC/QC samples are excluded from the check on both sides, since they are not expected to have protein measurements.
+
+#### Outlier Detection tab (Step 3b)
+A combined outlier detection and exclusion workflow, positioned upstream of Plot single lipid so that exclusions apply to every downstream analysis (Plot single lipid, Class Bar Plots, Export, PCA, Statistics, Volcano, Heatmap, Enrichment, Correlation Network, Synthesis Pathways):
+
+- **Sample-level — PCA Hotelling's T²**: flags samples beyond a user-selected confidence threshold (95/97.5/99%) on a self-contained PCA (log-transformed, unit-variance scaled, IS-normalised, non-blank/non-iQC/non-ISTD samples).
+- **Sample-level — iQC replicate deviation**: for datasets with ≥ 3 iQC replicates, flags iQC samples whose median relative deviation from the cross-replicate median exceeds a MAD-based threshold. Informational only — iQC/ISTD/Blank samples are never excluded from downstream analyses regardless of this flag.
+- **Feature-level — per lipid × group**: flags individual sample values within a Metabolite name × group combination using either a modified Z-score (MAD, robust to skew) or the classic IQR rule, both with adjustable thresholds.
+- **Bulk exclude toggles** (off by default) apply all auto-flagged samples/points to the shared dataset used by every other tab. Excluded feature points are set to missing rather than deleted; excluded samples are removed from the shared reactive but never from the underlying file.
+- **Individual review & manual override**: a selectable "Sample review" table (T² score per sample) and a selectable feature-level candidates table let specific samples/points be individually excluded or kept, independently of (and taking precedence over) the bulk toggles.
+- ISTD, Blank, and iQC/QC samples are excluded from the entire outlier detection and exclusion workflow — they are never flagged, never excluded, and never contribute to the candidate pool.
+
+#### PCA — iQC and ISTD handled as supplementary (projected) individuals
+The PCA fit (axes, loadings, and centring/scaling statistics) is now computed from biological samples only. iQC and ISTD-only samples, if included, are fitted as FactoMineR supplementary individuals — projected into the fitted space afterward without being able to distort the ordination. Since neither type is typically present in the protein CSV, they are scaled by the *median* protein content of the biological samples (an assumed, not measured, value) purely so their projection lands somewhere visually comparable. Two independent toggles control inclusion: **Include iQC samples** (on by default) and **Include ISTD-only samples** (off by default, since an ISTD-only injection has no biological matrix and a very different lipid profile to a real sample). The plot legend distinguishes real groups, iQC, and ISTD with distinct colours; supplementary points are shown as triangles.
+
+#### PCA — plot export and sample ID labels
+The PCA tab now has the same standardised Width/Height/DPI/Scale/Base font size export controls with PNG/SVG buttons used throughout the rest of the app, plus a **Show sample ID labels** toggle (off by default, using ggrepel to avoid overlap).
+
+### Bug fixes
+
+#### iQC and ISTD-named samples were being conflated throughout the app
+The internal `is_iqc_sample()` helper matched `iqc`, `qc`, `istd`, and `itsd` all as equivalent. A sample named ISTD (an internal-standard-only injection with no biological matrix) was therefore being treated identically to a pooled iQC replicate everywhere in the app, including the PCA tab — where its very different lipid profile appeared as a spurious dominant point and inflated apparent variance. Split into `is_iqc_sample()` (iQC/QC only), a new `is_istd_sample()` (ISTD/ITSD only), and `is_qc_type_sample()` (their union, used wherever the existing broad "not a real biological sample" behaviour was correct, e.g. `filter_iqc()`, outlier detection, and the Protein Match tab).
+
+#### PCA plot crash: "number of active individuals is different from the length of the factor habillage"
+`factoextra::fviz_pca_ind()` requires the `habillage` grouping factor to be sized to active individuals only; supplementary individuals must be styled separately. The PCA plot no longer uses `fviz_pca_ind()` — it is built directly from `pca_result()$ind$coord` and `pca_result()$ind.sup$coord`, which also removes an unexplained extra point that had been appearing on the plot (traced to the iQC/ISTD conflation above).
+
+#### Backtick-quoted column name with a `\u` unicode escape
+A column name written as `` `T\u00b2 score` `` failed to parse — R does not support `\u` unicode escapes inside backtick-quoted names, only inside string literals. Replaced with the literal `²` character.
+
+### Improvements
+
+#### Step numbering
+Outlier Detection is now Step 3b (moved from its original position after PCA Analysis to upstream of Plot single lipid, so its exclusions can propagate to every downstream tab). Protein Match remains Step 3a. All other step numbers are unchanged.
+
+---
+
 ## [0.0.4] — 2026-06-21
 
 ### New features

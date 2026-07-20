@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.0.4
+# LipiRich v0.1.0
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -40,7 +40,7 @@
 # Tested with: MS-DIAL 5.5.251021, R 4.5.2, Bioconductor 3.22
 # --------------------------
 
-APP_VERSION <- "0.0.4"
+APP_VERSION <- "0.1.0"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -212,15 +212,38 @@ enrichment_spinner_css <- tags$style(HTML("
 
 
 # --- iQC / QC / ISTD sample tag helpers ---
+# iQC and ISTD are NOT the same thing: iQC is a pooled biological QC sample
+# (real matrix, monitors extraction/injection reproducibility); a sample
+# literally named ISTD/ITSD is typically an internal-standard-only injection
+# with no biological matrix, and has a wildly different lipid profile. They
+# are kept as separate checks so callers that need to tell them apart (e.g.
+# PCA) can, while callers that just want "not a real biological sample"
+# (is_qc_type_sample / filter_iqc / is_protected_sample) still catch both.
 is_iqc_sample <- function(x) {
-  # Matches iQC, QC, ISTD, ITSD anywhere in name, case-insensitive
-  grepl("iqc|\\bqc\\b|istd|itsd", x, ignore.case = TRUE, perl = TRUE)
+  # Matches iQC or standalone QC only — NOT ISTD/ITSD
+  grepl("iqc|\\bqc\\b", x, ignore.case = TRUE, perl = TRUE)
+}
+is_istd_sample <- function(x) {
+  # Matches ISTD/ITSD only — a whole sample injection, not the "[IS]" metabolite tag
+  grepl("istd|itsd", x, ignore.case = TRUE, perl = TRUE)
+}
+is_qc_type_sample <- function(x) {
+  is_iqc_sample(x) | is_istd_sample(x)
 }
 filter_iqc <- function(df, include_iqc = FALSE, sample_col = "sample") {
   if (include_iqc) return(df)
   if (is.null(df) || nrow(df) == 0) return(df)
   sc <- df[[sample_col]]
-  df[!is_iqc_sample(sc), , drop = FALSE]
+  df[!is_qc_type_sample(sc), , drop = FALSE]
+}
+
+# Samples that should never be treated as biological samples for outlier
+# detection/exclusion or protein-match checking: ISTD, iQC/QC, and Blank
+# (flexible match: "Blank", "Blank_1", "Blank-2", etc.)
+is_protected_sample <- function(x) {
+  x  <- as.character(x)
+  sn <- stringr::str_trim(stringr::str_to_lower(x))
+  is_qc_type_sample(x) | stringr::str_detect(sn, "^blank(?:$|[-_])")
 }
 
 
@@ -646,7 +669,7 @@ landing_page_ui <- function() {
       tags$p("If you use LipiRich in your research, please cite:"),
       div(class = "cite-box",
           "Hancock, SE. (2026). LipiRich: A Shiny application for normalisation,
-statistics, and visualisation of MS-DIAL lipidomics data (v0.0.4).
+statistics, and visualisation of MS-DIAL lipidomics data (v0.1.0).
 GitHub: https://github.com/sarahehancock/LipiRich
 DOI: [pending]"
       ),
@@ -984,6 +1007,116 @@ ui <- fluidPage(
                  h4("Step 3: Background Subtraction & Normalisation"),
                  DTOutput("bgNormTable")
         ),
+        tabPanel("Protein Match",
+                 h4("Step 3a: Protein Normalisation Sample Matching"),
+                 helpText(tags$small(
+                   "Checks whether each imported MS-DIAL sample (", tags$code("_pos"), "/",
+                   tags$code("_neg"), " suffix stripped) has a matching row in the uploaded",
+                   " protein content CSV, and flags any protein CSV rows with no corresponding sample.",
+                   " ISTD, Blank, and iQC/QC samples are excluded from this check on both sides."
+                 )),
+                 verbatimTextOutput("protein_match_summary"),
+                 br(),
+                 DT::DTOutput("proteinMatchTable")
+        ),
+        tabPanel("Outlier Detection",
+                 h4("Step 3b: Outlier Detection"),
+                 helpText(tags$small(
+                   "Flags potential outlier ", tags$strong("samples"), " (PCA Hotelling's T\u00b2 and iQC replicate deviation)",
+                   " and potential outlier ", tags$strong("data points"), " within a lipid feature \u00d7 group",
+                   " (modified Z-score or IQR rule), and applies any exclusions to every downstream tab",
+                   " from ", tags$strong("Plot single lipid"), " onward. ISTD, Blank, and iQC/QC-named samples",
+                   " are never flagged or excluded here \u2014 they're outside the scope of biological outlier",
+                   " detection and are handled by their own dedicated logic elsewhere in the app."
+                 )),
+                 fluidRow(
+                   column(
+                     width = 3,
+                     wellPanel(
+                       h5("Sample-level \u2014 PCA"),
+                       selectInput(
+                         "outlier_sample_conf", "Confidence level",
+                         choices  = c("95%" = "0.95", "97.5%" = "0.975", "99%" = "0.99"),
+                         selected = "0.975"
+                       ),
+                       checkboxInput("outlier_exclude_samples",
+                                     "Exclude all auto-flagged samples from downstream analyses",
+                                     value = FALSE),
+                       tags$hr(),
+                       h5("Sample-level \u2014 iQC deviation"),
+                       helpText(tags$small(
+                         "Requires \u2265 3 iQC replicate samples; skipped otherwise. Informational only \u2014",
+                         " iQC samples themselves are never excluded from downstream analyses."
+                       )),
+                       numericInput("outlier_iqc_mad", "MAD multiplier", value = 3, min = 1, max = 10, step = 0.5),
+                       tags$hr(),
+                       h5("Feature-level \u2014 per lipid \u00d7 group"),
+                       radioButtons(
+                         "outlier_feature_method", "Method",
+                         choices  = c("Modified Z-score (MAD)" = "mad", "IQR rule" = "iqr"),
+                         selected = "mad"
+                       ),
+                       numericInput("outlier_feature_mult", "Threshold multiplier", value = 3, min = 1, max = 10, step = 0.5),
+                       helpText(tags$small(
+                         tags$strong("Modified Z:"), " flags points where |value \u2212 median| / MAD exceeds the multiplier",
+                         " (3\u20133.5 is a common default).",
+                         tags$br(),
+                         tags$strong("IQR:"), " flags points beyond Q1/Q3 \u00b1 multiplier \u00d7 IQR (1.5 = standard boxplot rule)."
+                       )),
+                       checkboxInput("outlier_exclude_features",
+                                     "Exclude all auto-flagged points from downstream analyses",
+                                     value = FALSE),
+                       helpText(tags$small(
+                         "Excluded points/samples are removed from the shared dataset used by every",
+                         " other tab, not deleted from your file \u2014 turn a toggle back off, or use the",
+                         " manual review tables, to restore them at any time."
+                       ))
+                     )
+                   ),
+                   column(
+                     width = 9,
+                     h5("Sample-level: PCA Hotelling's T\u00b2"),
+                     plotOutput("outlierSamplePlot", height = "320px"),
+                     tags$hr(),
+                     h5("Sample-level: iQC replicate deviation"),
+                     plotOutput("outlierIqcPlot", height = "280px"),
+                     tags$hr(),
+                     h5("Sample review & individual exclusion"),
+                     helpText(tags$small(
+                       "Select one or more rows below, then use a button to override the automatic",
+                       " decision for those specific samples \u2014 independently of the toggle above.",
+                       " ISTD/Blank/iQC samples are not listed here."
+                     )),
+                     fluidRow(
+                       column(width = 4, actionButton("sample_manual_exclude_btn", "Exclude selected",
+                                                      icon = icon("ban"), class = "btn-sm btn-danger")),
+                       column(width = 4, actionButton("sample_manual_keep_btn", "Keep selected (override)",
+                                                      icon = icon("check"), class = "btn-sm btn-success")),
+                       column(width = 4, actionButton("sample_manual_clear_btn", "Clear manual overrides",
+                                                      icon = icon("rotate-left"), class = "btn-sm"))
+                     ),
+                     br(),
+                     DTOutput("sampleReviewTable"),
+                     tags$hr(),
+                     h5("Feature-level outliers: review & individual exclusion"),
+                     verbatimTextOutput("outlier_feature_summary"),
+                     helpText(tags$small(
+                       "Select one or more rows below, then use a button to override the automatic",
+                       " decision for those specific points \u2014 independently of the toggle above."
+                     )),
+                     fluidRow(
+                       column(width = 4, actionButton("feature_manual_exclude_btn", "Exclude selected",
+                                                      icon = icon("ban"), class = "btn-sm btn-danger")),
+                       column(width = 4, actionButton("feature_manual_keep_btn", "Keep selected (override)",
+                                                      icon = icon("check"), class = "btn-sm btn-success")),
+                       column(width = 4, actionButton("feature_manual_clear_btn", "Clear manual overrides",
+                                                      icon = icon("rotate-left"), class = "btn-sm"))
+                     ),
+                     br(),
+                     DTOutput("outlierFeatureTable")
+                   )
+                 )
+        ),
         tabPanel("Plot single lipid",
                  h4("Step 4: Plot Individual Metabolites or Total by Class"),
                  fluidRow(
@@ -1166,7 +1299,26 @@ ui <- fluidPage(
                      wellPanel(
                        h5("PCA Options"),
                        checkboxInput("exclude_blank_pca", "Exclude samples named 'Blank'", value = TRUE),
-                       checkboxInput("pca_show_iqc", "Include iQC samples (normalized)", value = TRUE),
+                       checkboxInput("pca_show_iqc", "Include iQC samples (projected)", value = TRUE),
+                       checkboxInput("pca_show_istd", "Include ISTD-only samples (projected)", value = FALSE),
+                       helpText(tags$small(
+                         "iQC (pooled biological QC) and ISTD-only injections (no biological matrix)",
+                         " are ", tags$strong("not the same thing"), " and are never treated as equivalent.",
+                         " ISTD samples are excluded by default \u2014 their lipid profile is so different",
+                         " from a real sample that including them was previously showing up as a",
+                         " spurious dominant point."
+                       )),
+                       conditionalPanel(
+                         condition = "input.use_protein_norm == true && (input.pca_show_iqc == true || input.pca_show_istd == true)",
+                         helpText(tags$small(
+                           "Both are fitted as ", tags$strong("supplementary points"), ":",
+                           " the PCA axes are calculated from biological samples only, so neither can",
+                           " distort the ordination. Since they usually aren't in the protein CSV,",
+                           " they're projected after being scaled by the ", tags$em("median"),
+                           " protein content of the biological samples \u2014 an assumed, not measured,",
+                           " value \u2014 purely so they land in a comparable position for visual QC."
+                         ))
+                       ),
                        radioButtons(
                          "pca_measure",
                          "Data to use:",
@@ -1212,7 +1364,20 @@ ui <- fluidPage(
                        tags$hr(),
                        h5("Group selection"),
                        helpText(tags$small("Select which groups to include in the PCA plot.")),
-                       uiOutput("pca_group_select_ui")
+                       uiOutput("pca_group_select_ui"),
+                       tags$hr(),
+                       checkboxInput("pca_show_labels", "Show sample ID labels", value = FALSE),
+                       tags$hr(),
+                       h5("Export plot"),
+                       numericInput("pca_export_width",    "Width (px)",      1200, 400, 4000, 50),
+                       numericInput("pca_export_height",   "Height (px)",      900, 300, 4000, 50),
+                       numericInput("pca_export_dpi",      "DPI",              300,  72,  600, 12),
+                       numericInput("pca_export_scale",    "Scale fraction",  1.00, 0.25, 2.00, 0.05),
+                       numericInput("pca_export_fontsize", "Base font size",    14,    6,   24,  1),
+                       fluidRow(
+                         column(6, downloadButton("download_pca_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_pca_svg", "SVG"))
+                       )
                      )
                    ),
                    column(
@@ -2534,6 +2699,183 @@ server <- function(input, output, session) {
     )
   })
   
+  # ---- Protein normalisation sample-matching diagnostic ----
+  # Compares distinct imported MS-DIAL samples (sample_norm) against the
+  # uploaded protein CSV, independent of whether "Apply protein normalisation"
+  # is currently ticked, so mismatches can be spotted before enabling it.
+  protein_match_table <- reactive({
+    req(bg_norm_long())
+    
+    msdial_samples <- bg_norm_long() %>%
+      dplyr::distinct(sample, sample_norm) %>%
+      dplyr::filter(!is_protected_sample(sample)) %>%
+      dplyr::arrange(sample)
+    
+    base_missing_csv <- msdial_samples %>%
+      dplyr::transmute(
+        Sample            = sample,
+        `In MS-DIAL Data` = TRUE,
+        `In Protein CSV`  = FALSE,
+        `Protein Value`   = NA_real_,
+        Status            = "No protein CSV uploaded"
+      )
+    
+    if (is.null(input$protein_csv)) return(base_missing_csv)
+    
+    prot <- tryCatch(protein_df(), error = function(e) NULL)
+    if (is.null(prot)) {
+      return(dplyr::mutate(base_missing_csv, Status = "Protein CSV error — check columns: sample, protein."))
+    }
+    
+    prot_norm <- prot %>%
+      dplyr::filter(!is_protected_sample(sample)) %>%
+      dplyr::mutate(sample_norm = normalize_sample_name(sample)) %>%
+      dplyr::rename(protein_sample = sample)
+    
+    msdial_samples %>%
+      dplyr::full_join(prot_norm, by = "sample_norm") %>%
+      dplyr::mutate(
+        Sample            = dplyr::coalesce(sample, protein_sample),
+        `In MS-DIAL Data` = !is.na(sample),
+        `In Protein CSV`  = !is.na(protein_sample),
+        `Protein Value`   = protein,
+        Status = dplyr::case_when(
+          `In MS-DIAL Data` & `In Protein CSV`  ~ "Matched",
+          `In MS-DIAL Data` & !`In Protein CSV` ~ "Missing from protein CSV",
+          !`In MS-DIAL Data` & `In Protein CSV` ~ "Extra in protein CSV (no matching sample)",
+          TRUE ~ "Unknown"
+        )
+      ) %>%
+      dplyr::select(Sample, `In MS-DIAL Data`, `In Protein CSV`, `Protein Value`, Status) %>%
+      dplyr::arrange(Status != "Matched", Sample)
+  })
+  
+  output$protein_match_summary <- renderText({
+    df <- protein_match_table()
+    req(df)
+    
+    if (is.null(input$protein_csv)) return("Upload a protein CSV (Background & Normalisation sidebar) to check sample matching.")
+    
+    n_total   <- sum(df$`In MS-DIAL Data`)
+    n_matched <- sum(df$Status == "Matched")
+    n_missing <- sum(df$Status == "Missing from protein CSV")
+    n_extra   <- sum(df$Status == "Extra in protein CSV (no matching sample)")
+    
+    paste0(
+      n_matched, " of ", n_total, " imported samples matched to protein data.",
+      if (n_missing > 0) paste0("\n\u26a0 ", n_missing, " sample(s) have no protein value — will NOT be protein-normalised.") else "",
+      if (n_extra   > 0) paste0("\n\u26a0 ", n_extra,   " protein CSV row(s) do not match any imported sample — check for typos.") else "",
+      if (n_missing == 0 && n_extra == 0) "\n\u2713 All samples matched." else ""
+    )
+  })
+  
+  output$proteinMatchTable <- DT::renderDT({
+    df <- protein_match_table()
+    
+    DT::datatable(
+      df,
+      rownames = FALSE,
+      options  = list(pageLength = 15, order = list()),
+      class    = "stripe hover"
+    ) %>%
+      DT::formatStyle(
+        "Status",
+        target = "row",
+        backgroundColor = DT::styleEqual(
+          c("Matched",
+            "Missing from protein CSV",
+            "Extra in protein CSV (no matching sample)",
+            "No protein CSV uploaded",
+            "Protein CSV error — check columns: sample, protein."),
+          c("#e6f4ea", "#fdecea", "#fdecea", "#f5f5f5", "#fdecea")
+        )
+      )
+  })
+  
+  # ---- Outlier Detection tab outputs ----
+  output$outlierSamplePlot <- renderPlot({
+    df <- sample_outlier_flags()
+    validate(need(nrow(df) > 0,
+                  "Not enough samples/features for PCA-based outlier detection (need \u2265 5 non-blank samples and \u2265 2 informative features)."))
+    df <- df %>%
+      dplyr::arrange(dplyr::desc(score)) %>%
+      dplyr::mutate(sample = factor(sample, levels = sample))
+    
+    ggplot2::ggplot(df, ggplot2::aes(x = sample, y = score, fill = is_outlier)) +
+      ggplot2::geom_col() +
+      ggplot2::geom_hline(yintercept = df$threshold[1], linetype = "dashed", colour = "red") +
+      ggplot2::scale_fill_manual(values = c(`FALSE` = "#4c72b0", `TRUE` = "#c44e52"),
+                                 labels = c("Normal", "Flagged"), name = NULL) +
+      ggplot2::labs(x = NULL, y = "Hotelling's T\u00b2") +
+      ggplot2::theme_minimal(base_size = 13) +
+      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+  })
+  
+  output$outlierIqcPlot <- renderPlot({
+    df <- iqc_outlier_flags()
+    validate(need(nrow(df) > 0, "Fewer than 3 iQC samples detected \u2014 iQC deviation check skipped."))
+    df <- df %>%
+      dplyr::arrange(dplyr::desc(score)) %>%
+      dplyr::mutate(sample = factor(sample, levels = sample))
+    
+    ggplot2::ggplot(df, ggplot2::aes(x = sample, y = score, fill = is_outlier)) +
+      ggplot2::geom_col() +
+      ggplot2::geom_hline(yintercept = df$threshold[1], linetype = "dashed", colour = "red") +
+      ggplot2::scale_fill_manual(values = c(`FALSE` = "#4c72b0", `TRUE` = "#c44e52"),
+                                 labels = c("Normal", "Flagged"), name = NULL) +
+      ggplot2::labs(x = NULL, y = "Median relative deviation") +
+      ggplot2::theme_minimal(base_size = 13) +
+      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+  })
+  
+  output$outlier_feature_summary <- renderText({
+    df <- feature_outlier_flags()
+    if (nrow(df) == 0) return("No feature-level outliers flagged with current settings.")
+    paste0(
+      nrow(df), " flagged data point(s) across ",
+      dplyr::n_distinct(df$`Metabolite name`), " feature(s) and ",
+      dplyr::n_distinct(df$group), " group(s)."
+    )
+  })
+  
+  output$outlierFeatureTable <- DT::renderDT({
+    df <- feature_outlier_flags()
+    validate(need(nrow(df) > 0, "No feature-level outliers flagged with current settings."))
+    
+    keys <- .feature_key(df$sample, df[["Metabolite name"]])
+    
+    df %>%
+      dplyr::mutate(
+        `Manual override` = dplyr::case_when(
+          keys %in% manual_feature_keep()    ~ "Kept",
+          keys %in% manual_feature_exclude() ~ "Excluded",
+          TRUE ~ ""
+        ),
+        `Effective status` = dplyr::case_when(
+          keys %in% manual_feature_keep()         ~ "Included",
+          keys %in% manual_feature_exclude()       ~ "Excluded",
+          isTRUE(input$outlier_exclude_features)   ~ "Excluded",
+          TRUE ~ "Included"
+        )
+      ) %>%
+      dplyr::transmute(
+        Sample              = sample,
+        `Metabolite name`   = `Metabolite name`,
+        Class               = class,
+        Group               = group,
+        Value               = signif(value, 4),
+        Score               = round(score, 2),
+        Method              = method,
+        `Manual override`,
+        `Effective status`
+      ) %>%
+      DT::datatable(rownames = FALSE, selection = "multiple", options = list(pageLength = 15)) %>%
+      DT::formatStyle(
+        "Effective status", target = "row",
+        backgroundColor = DT::styleEqual(c("Excluded", "Included"), c("#fdecea", "white"))
+      )
+  })
+  
   # ---- Read uploaded CSV and build mapping ----
   group_csv_df <- reactive({
     req(input$group_csv)
@@ -2858,7 +3200,63 @@ server <- function(input, output, session) {
       )
   }
   
-  bg_norm_long_resolved <- reactive({
+  # ---- Manual outlier override state ----
+  # Individual add/remove of specific samples or feature points, independent of
+  # (and taking precedence over) the bulk "exclude all flagged" toggles.
+  manual_sample_exclude  <- reactiveVal(character(0))
+  manual_sample_keep     <- reactiveVal(character(0))
+  manual_feature_exclude <- reactiveVal(character(0))
+  manual_feature_keep    <- reactiveVal(character(0))
+  
+  .feature_key <- function(sample, metabolite) paste(sample, metabolite, sep = "\r__\r")
+  
+  observeEvent(input$sample_manual_exclude_btn, {
+    sel <- input$sampleReviewTable_rows_selected
+    req(length(sel) > 0)
+    tbl <- isolate(sample_review_table())
+    picked <- tbl$Sample[sel]
+    manual_sample_exclude(union(manual_sample_exclude(), picked))
+    manual_sample_keep(setdiff(manual_sample_keep(), picked))
+  })
+  
+  observeEvent(input$sample_manual_keep_btn, {
+    sel <- input$sampleReviewTable_rows_selected
+    req(length(sel) > 0)
+    tbl <- isolate(sample_review_table())
+    picked <- tbl$Sample[sel]
+    manual_sample_keep(union(manual_sample_keep(), picked))
+    manual_sample_exclude(setdiff(manual_sample_exclude(), picked))
+  })
+  
+  observeEvent(input$sample_manual_clear_btn, {
+    manual_sample_exclude(character(0))
+    manual_sample_keep(character(0))
+  })
+  
+  observeEvent(input$feature_manual_exclude_btn, {
+    sel <- input$outlierFeatureTable_rows_selected
+    req(length(sel) > 0)
+    tbl <- isolate(feature_outlier_flags())
+    picked <- .feature_key(tbl$sample[sel], tbl[["Metabolite name"]][sel])
+    manual_feature_exclude(union(manual_feature_exclude(), picked))
+    manual_feature_keep(setdiff(manual_feature_keep(), picked))
+  })
+  
+  observeEvent(input$feature_manual_keep_btn, {
+    sel <- input$outlierFeatureTable_rows_selected
+    req(length(sel) > 0)
+    tbl <- isolate(feature_outlier_flags())
+    picked <- .feature_key(tbl$sample[sel], tbl[["Metabolite name"]][sel])
+    manual_feature_keep(union(manual_feature_keep(), picked))
+    manual_feature_exclude(setdiff(manual_feature_exclude(), picked))
+  })
+  
+  observeEvent(input$feature_manual_clear_btn, {
+    manual_feature_exclude(character(0))
+    manual_feature_keep(character(0))
+  })
+  
+  bg_norm_pre_outlier <- reactive({
     req(bg_norm_long())
     df_res <- resolve_ion_modes(bg_norm_long(),
                                 pref_neg = pref_neg_classes(),
@@ -2868,7 +3266,13 @@ server <- function(input, output, session) {
     df_res <- df_res %>%
       dplyr::mutate(
         sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample)),
-        is_iqc = is_iqc_sample(sample)
+        is_iqc = is_iqc_sample(sample),
+        # Preserve pre-protein-normalisation values so individual tabs (e.g. PCA)
+        # can opt out of protein normalisation even when the global toggle is on —
+        # useful since iQC samples are rarely present in the protein CSV and would
+        # otherwise sit on a different scale to protein-normalised biological samples.
+        norm_raw     = norm,
+        value_bs_raw = value_bs
       )
     
     # ── Force Shiny to track protein norm toggle unconditionally ─────────────
@@ -2895,6 +3299,290 @@ server <- function(input, output, session) {
     }
     
     df_res
+  })
+  
+  # ---- Sample-level outlier detection: PCA Hotelling's T² ----
+  # Applied to non-blank samples (iQC included) on IS-normalised values, log-transformed
+  # and unit-variance scaled, mirroring the PCA tab's default treatment but kept
+  # self-contained so this tab doesn't depend on the PCA tab's own selections.
+  sample_outlier_flags <- reactive({
+    req(bg_norm_pre_outlier())
+    
+    empty_result <- tibble::tibble(
+      sample = character(0), score = numeric(0), threshold = numeric(0),
+      is_outlier = logical(0)
+    )
+    
+    df0 <- bg_norm_pre_outlier() %>%
+      dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"))
+    df0 <- df0[!is_protected_sample(df0$sample), , drop = FALSE]
+    if (nrow(df0) == 0) return(empty_result)
+    
+    mat <- df0 %>%
+      dplyr::group_by(sample, `Metabolite name`) %>%
+      dplyr::summarise(value = mean(norm, na.rm = TRUE), .groups = "drop") %>%
+      tidyr::pivot_wider(names_from = `Metabolite name`, values_from = value, values_fill = NA_real_) %>%
+      as.data.frame()
+    
+    if (is.null(mat$sample) || nrow(mat) < 5) return(empty_result)
+    
+    rownames(mat) <- mat$sample
+    mat$sample <- NULL
+    mat[] <- lapply(mat, function(x) suppressWarnings(as.numeric(x)))
+    
+    keep <- vapply(mat, function(x) {
+      sdv <- stats::sd(x, na.rm = TRUE)
+      sum(!is.na(x)) >= 3 && is.finite(sdv) && sdv > 0
+    }, logical(1))
+    mat <- mat[, keep, drop = FALSE]
+    if (ncol(mat) < 2 || nrow(mat) < 5) return(empty_result)
+    
+    mat <- log1p(pmax(mat, 0, na.rm = TRUE))
+    for (j in seq_len(ncol(mat))) {
+      v <- mat[[j]]
+      if (anyNA(v)) v[is.na(v)] <- stats::median(v, na.rm = TRUE)
+      mat[[j]] <- v
+    }
+    
+    conf <- suppressWarnings(as.numeric(input$outlier_sample_conf %||% "0.975"))
+    if (!is.finite(conf)) conf <- 0.975
+    n <- nrow(mat)
+    k <- min(5, ncol(mat) - 1, n - 2)
+    if (k < 2) return(empty_result)
+    
+    pca <- tryCatch(stats::prcomp(mat, center = TRUE, scale. = TRUE), error = function(e) NULL)
+    if (is.null(pca)) return(empty_result)
+    
+    scores <- pca$x[, seq_len(k), drop = FALSE]
+    eig    <- (pca$sdev[seq_len(k)])^2
+    eig[eig <= 0] <- .Machine$double.eps
+    
+    t2        <- rowSums(sweep(scores^2, 2, eig, "/"))
+    f_crit    <- stats::qf(conf, k, n - k)
+    t2_thresh <- (k * (n - 1) / (n - k)) * f_crit
+    
+    tibble::tibble(
+      sample     = rownames(mat),
+      score      = as.numeric(t2),
+      threshold  = t2_thresh,
+      is_outlier = t2 > t2_thresh
+    )
+  })
+  
+  # ---- Sample-level outlier detection: iQC replicate deviation ----
+  # For each iQC sample, the median relative deviation from the cross-replicate
+  # median across all features — a robust measure of "how far off is this run".
+  iqc_outlier_flags <- reactive({
+    req(bg_norm_pre_outlier())
+    
+    empty_result <- tibble::tibble(
+      sample = character(0), score = numeric(0), threshold = numeric(0),
+      is_outlier = logical(0)
+    )
+    
+    df0 <- bg_norm_pre_outlier() %>%
+      dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"), is_iqc_sample(sample))
+    if (nrow(df0) == 0) return(empty_result)
+    
+    mat <- df0 %>%
+      dplyr::group_by(sample, `Metabolite name`) %>%
+      dplyr::summarise(value = mean(norm, na.rm = TRUE), .groups = "drop") %>%
+      tidyr::pivot_wider(names_from = `Metabolite name`, values_from = value, values_fill = NA_real_) %>%
+      as.data.frame()
+    
+    if (is.null(mat$sample) || nrow(mat) < 3) return(empty_result)
+    
+    rownames(mat) <- mat$sample
+    mat$sample <- NULL
+    mat_m <- as.matrix(mat)
+    mat_m[] <- suppressWarnings(as.numeric(mat_m))
+    
+    mult <- suppressWarnings(as.numeric(input$outlier_iqc_mad %||% "3"))
+    if (!is.finite(mult)) mult <- 3
+    
+    med     <- apply(mat_m, 2, stats::median, na.rm = TRUE)
+    rel_dev <- abs(sweep(mat_m, 2, med, "-"))
+    rel_dev <- sweep(rel_dev, 2, abs(med), "/")
+    rel_dev[!is.finite(rel_dev)] <- NA_real_
+    
+    score  <- apply(rel_dev, 1, stats::median, na.rm = TRUE)
+    center <- stats::median(score, na.rm = TRUE)
+    spread <- stats::mad(score, na.rm = TRUE)
+    thresh <- center + mult * spread
+    
+    tibble::tibble(
+      sample     = rownames(mat_m),
+      score      = as.numeric(score),
+      threshold  = thresh,
+      is_outlier = score > thresh
+    )
+  })
+  
+  # ---- Combined sample review table for manual override ----
+  # Lists every non-protected (ISTD/Blank/iQC excluded) sample with its PCA
+  # Hotelling's T² score/flag and the current manual override state, so a
+  # specific sample can be individually excluded or kept regardless of the
+  # bulk "exclude all flagged" toggle.
+  sample_review_table <- reactive({
+    req(bg_norm_pre_outlier())
+    
+    base <- bg_norm_pre_outlier() %>%
+      dplyr::distinct(sample) %>%
+      dplyr::filter(!is_protected_sample(sample)) %>%
+      dplyr::arrange(sample)
+    
+    validate(need(nrow(base) > 0, "No non-ISTD/Blank/iQC samples available."))
+    
+    flags <- sample_outlier_flags()
+    
+    base %>%
+      dplyr::left_join(
+        flags %>% dplyr::select(sample, t2_score = score, t2_flag = is_outlier),
+        by = "sample"
+      ) %>%
+      dplyr::mutate(
+        t2_flag          = dplyr::coalesce(t2_flag, FALSE),
+        `Manual override` = dplyr::case_when(
+          sample %in% manual_sample_keep()    ~ "Kept",
+          sample %in% manual_sample_exclude() ~ "Excluded",
+          TRUE ~ ""
+        ),
+        `Effective status` = dplyr::case_when(
+          sample %in% manual_sample_keep()               ~ "Included",
+          sample %in% manual_sample_exclude()             ~ "Excluded",
+          isTRUE(input$outlier_exclude_samples) & t2_flag ~ "Excluded",
+          TRUE ~ "Included"
+        )
+      ) %>%
+      dplyr::transmute(
+        Sample          = sample,
+        `T² score`      = round(t2_score, 2),
+        `Auto flagged`  = t2_flag,
+        `Manual override`,
+        `Effective status`
+      ) %>%
+      dplyr::arrange(`Effective status` == "Included", dplyr::desc(`Auto flagged`), Sample)
+  })
+  
+  output$sampleReviewTable <- DT::renderDT({
+    df <- sample_review_table()
+    DT::datatable(
+      df, rownames = FALSE, selection = "multiple",
+      options = list(pageLength = 10), class = "stripe hover"
+    ) %>%
+      DT::formatStyle(
+        "Effective status", target = "row",
+        backgroundColor = DT::styleEqual(c("Excluded", "Included"), c("#fdecea", "white"))
+      )
+  })
+  
+  # ---- Feature-level outlier detection: per lipid × group ----
+  # Flags individual sample values within a Metabolite name × group combination
+  # (blanks and iQC excluded, groups from the active grouping scheme).
+  feature_outlier_flags <- reactive({
+    req(bg_norm_pre_outlier())
+    
+    empty_result <- tibble::tibble(
+      sample = character(0), `Metabolite name` = character(0), class = character(0),
+      group = character(0), value = numeric(0), score = numeric(0),
+      method = character(0)
+    )
+    
+    df0 <- bg_norm_pre_outlier() %>%
+      dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"))
+    df0 <- df0[!is_protected_sample(df0$sample), , drop = FALSE]
+    if (nrow(df0) == 0) return(empty_result)
+    
+    fn        <- get_active_grouping()
+    df0$group <- fn(df0$sample)$group
+    df0       <- df0[!is.na(df0$group), , drop = FALSE]
+    if (nrow(df0) == 0) return(empty_result)
+    
+    method <- input$outlier_feature_method %||% "mad"
+    mult   <- suppressWarnings(as.numeric(input$outlier_feature_mult %||% "3"))
+    if (!is.finite(mult)) mult <- 3
+    
+    if (identical(method, "iqr")) {
+      res <- df0 %>%
+        dplyr::group_by(`Metabolite name`, class, group) %>%
+        dplyr::filter(sum(!is.na(norm)) >= 4) %>%
+        dplyr::mutate(
+          q1             = stats::quantile(norm, 0.25, na.rm = TRUE),
+          q3             = stats::quantile(norm, 0.75, na.rm = TRUE),
+          iqr_val        = q3 - q1,
+          threshold_low  = q1 - mult * iqr_val,
+          threshold_high = q3 + mult * iqr_val,
+          is_outlier     = !is.na(norm) & (norm < threshold_low | norm > threshold_high),
+          score          = dplyr::if_else(iqr_val > 0,
+                                          pmax((q1 - norm) / iqr_val, (norm - q3) / iqr_val),
+                                          NA_real_)
+        ) %>%
+        dplyr::ungroup()
+    } else {
+      res <- df0 %>%
+        dplyr::group_by(`Metabolite name`, class, group) %>%
+        dplyr::filter(sum(!is.na(norm)) >= 4) %>%
+        dplyr::mutate(
+          med_val    = stats::median(norm, na.rm = TRUE),
+          mad_val    = stats::mad(norm, na.rm = TRUE),
+          score      = dplyr::if_else(mad_val > 0, abs(norm - med_val) / mad_val, NA_real_),
+          is_outlier = !is.na(score) & score > mult
+        ) %>%
+        dplyr::ungroup()
+    }
+    
+    res %>%
+      dplyr::filter(is_outlier) %>%
+      dplyr::transmute(
+        sample, `Metabolite name`, class, group,
+        value  = norm,
+        score,
+        method = if (identical(method, "iqr")) "IQR rule" else "Modified Z-score (MAD)"
+      ) %>%
+      dplyr::arrange(dplyr::desc(score))
+  })
+  
+  bg_norm_long_resolved <- reactive({
+    df <- bg_norm_pre_outlier()
+    
+    # ── Sample-level exclusion ────────────────────────────────────────────────
+    # Auto-flagged (PCA T²) samples if the bulk toggle is on, plus/minus any
+    # individual manual overrides. iQC deviation is informational only and never
+    # contributes to exclusion. ISTD/Blank/iQC samples are never excluded.
+    auto_flagged_samples <- if (isTRUE(input$outlier_exclude_samples)) {
+      sf <- sample_outlier_flags()
+      sf$sample[sf$is_outlier]
+    } else character(0)
+    
+    excluded_samples <- union(auto_flagged_samples, manual_sample_exclude())
+    excluded_samples <- setdiff(excluded_samples, manual_sample_keep())
+    excluded_samples <- excluded_samples[!is_protected_sample(excluded_samples)]
+    
+    if (length(excluded_samples) > 0) {
+      df <- df %>% dplyr::filter(!sample %in% excluded_samples)
+    }
+    
+    # ── Feature-level exclusion ───────────────────────────────────────────────
+    auto_flagged_keys <- if (isTRUE(input$outlier_exclude_features)) {
+      ff <- feature_outlier_flags()
+      .feature_key(ff$sample, ff[["Metabolite name"]])
+    } else character(0)
+    
+    excluded_keys <- union(auto_flagged_keys, manual_feature_exclude())
+    excluded_keys <- setdiff(excluded_keys, manual_feature_keep())
+    
+    if (length(excluded_keys) > 0) {
+      key_df <- .feature_key(df$sample, df[["Metabolite name"]])
+      hit    <- key_df %in% excluded_keys
+      if (any(hit)) {
+        df$norm[hit]         <- NA_real_
+        df$value_bs[hit]     <- NA_real_
+        df$norm_raw[hit]     <- NA_real_
+        df$value_bs_raw[hit] <- NA_real_
+      }
+    }
+    
+    df
   })
   
   # ---------- IS classes & plots ----------
@@ -3410,22 +4098,35 @@ server <- function(input, output, session) {
   })
   
   # ---- PCA ----
+  # iQC samples are handled as FactoMineR "supplementary individuals": the PCA
+  # axes/loadings are computed from biological samples only, then iQC are
+  # projected into that space afterward without influencing it. Since iQC are
+  # rarely present in the protein CSV (so bg_norm_pre_outlier() leaves their
+  # norm/value_bs un-normalised), they're scaled here by the *median* protein
+  # content of the biological samples — an assumed, not measured, value —
+  # purely so the projection lands somewhere visually meaningful.
   pca_data <- reactive({
     req(bg_norm_long_resolved())
-    measure <- req(input$pca_measure)
-    units   <- req(input$pca_units)
-    excl    <- isTRUE(input$exclude_blank_pca)
+    measure   <- req(input$pca_measure)
+    units     <- req(input$pca_units)
+    excl      <- isTRUE(input$exclude_blank_pca)
+    show_iqc  <- isTRUE(input$pca_show_iqc)
+    show_istd <- isTRUE(input$pca_show_istd)
     
     df0 <- bg_norm_long_resolved() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"))
     
     # ── Group selection filter ────────────────────────────────────────────────
-    # iQC samples must be excluded from group filtering (they have no group label)
-    # then re-added after filtering if pca_show_iqc is TRUE
-    sel_grps  <- input$pca_selected_groups
-    show_iqc  <- isTRUE(input$pca_show_iqc)
-    df0_iqc   <- df0 %>% dplyr::filter(is_iqc_sample(sample))
-    df0_noiqc <- df0 %>% dplyr::filter(!is_iqc_sample(sample))
+    # iQC and ISTD samples are distinct: iQC is a pooled biological QC sample;
+    # a sample named ISTD/ITSD is typically an internal-standard-only injection
+    # with no biological matrix, so it must never be treated as equivalent to
+    # iQC (mixing them was producing a spurious extra/dominant point). Both are
+    # excluded from group filtering (neither has a real group label) and, if
+    # shown at all, are added back as SUPPLEMENTARY points — never active.
+    sel_grps   <- input$pca_selected_groups
+    df0_iqc    <- df0 %>% dplyr::filter(is_iqc_sample(sample))
+    df0_istd   <- df0 %>% dplyr::filter(is_istd_sample(sample))
+    df0_noiqc  <- df0 %>% dplyr::filter(!is_qc_type_sample(sample))
     
     if (!is.null(sel_grps) && length(sel_grps) > 0) {
       fn      <- get_active_grouping()
@@ -3433,8 +4134,31 @@ server <- function(input, output, session) {
       df0_noiqc <- df0_noiqc[!is.na(grp_vec) & grp_vec %in% sel_grps, , drop = FALSE]
     }
     
-    # Recombine: always include filtered analyte samples; add iQC only if toggled on
-    df0 <- if (show_iqc) dplyr::bind_rows(df0_noiqc, df0_iqc) else df0_noiqc
+    # Scale both iQC and ISTD by the median biological protein content — neither
+    # is typically present in the protein CSV — purely so their projection lands
+    # somewhere comparable; never affects the fit itself.
+    if (isTRUE(input$use_protein_norm) && (nrow(df0_iqc) > 0 || nrow(df0_istd) > 0)) {
+      prot <- tryCatch(protein_df(), error = function(e) NULL)
+      if (!is.null(prot) && nrow(prot) > 0) {
+        prot_median <- stats::median(prot$protein, na.rm = TRUE)
+        if (is.finite(prot_median) && prot_median > 0) {
+          .scale_supp <- function(d) {
+            d %>% dplyr::mutate(
+              norm     = dplyr::if_else(!is.na(norm),     norm     / prot_median, norm),
+              value_bs = dplyr::if_else(!is.na(value_bs), value_bs / prot_median, value_bs)
+            )
+          }
+          if (nrow(df0_iqc)  > 0) df0_iqc  <- .scale_supp(df0_iqc)
+          if (nrow(df0_istd) > 0) df0_istd <- .scale_supp(df0_istd)
+        }
+      }
+    }
+    
+    # Recombine: filtered biological samples always included; iQC/ISTD added as
+    # supplementary rows only if their respective toggle is on
+    df0 <- df0_noiqc
+    if (show_iqc)  df0 <- dplyr::bind_rows(df0, df0_iqc)
+    if (show_istd) df0 <- dplyr::bind_rows(df0, df0_istd)
     
     if (identical(units, "percent")) {
       totals <- df0 %>%
@@ -3484,8 +4208,8 @@ server <- function(input, output, session) {
     }
     
     validate(
-      need(nrow(df) >= 3, "Not enough samples for PCA (need ≥ 3)."),
-      need(ncol(df) >= 2, "Not enough variables for PCA (need ≥ 2 with variance).")
+      need(sum(!is_qc_type_sample(rownames(df))) >= 3, "Not enough biological samples for PCA (need \u2265 3)."),
+      need(ncol(df) >= 2, "Not enough variables for PCA (need \u2265 2 with variance).")
     )
     
     if (anyNA(df)) {
@@ -3497,6 +4221,14 @@ server <- function(input, output, session) {
         }
       }
     }
+    
+    # FactoMineR's ind.sup mechanism requires supplementary rows to be
+    # identifiable by index — put biological (active) rows first, iQC/ISTD
+    # (supplementary) rows last, and record the split as an attribute.
+    is_supp     <- is_qc_type_sample(rownames(df))
+    ord         <- order(is_supp)
+    df          <- df[ord, , drop = FALSE]
+    attr(df, "is_supp") <- is_supp[ord]
     
     df
   })
@@ -3515,10 +4247,11 @@ server <- function(input, output, session) {
       incProgress(0.20, detail = "Scaling features")
       
       mat     <- pca_data()
+      is_supp <- attr(mat, "is_supp")
       scaling <- input$pca_scaling %||% "uv"
       
       # Impute any remaining NA/zero with half-min per feature
-      mat <- apply(mat, 2, function(x) {
+      mat_imp <- apply(mat, 2, function(x) {
         x[!is.finite(x) | x <= 0] <- NA_real_
         hm <- min(x, na.rm = TRUE) / 2
         x[is.na(x)] <- hm
@@ -3529,31 +4262,34 @@ server <- function(input, output, session) {
       scaled_mat <- switch(scaling,
                            uv = {
                              # Standard unit-variance: scale.unit=TRUE in FactoMineR handles this
-                             mat
+                             mat_imp
                            },
                            pareto = {
                              # Divide each feature by square root of its SD (after centering)
-                             sds <- apply(mat, 2, sd, na.rm = TRUE)
+                             sds <- apply(mat_imp, 2, sd, na.rm = TRUE)
                              sds[sds == 0] <- 1
-                             sweep(mat, 2, sqrt(sds), "/")
+                             sweep(mat_imp, 2, sqrt(sds), "/")
                            },
                            log_uv = {
                              # Log transform (log1p to handle zeros), then unit variance
-                             log1p(mat)
+                             log1p(mat_imp)
                            },
                            none = {
-                             mat
+                             mat_imp
                            },
-                           mat
+                           mat_imp
       )
       
       # For UV and log+UV, tell FactoMineR to scale to unit variance
       do_scale <- scaling %in% c("uv", "log_uv")
       
       incProgress(0.60, detail = "FactoMineR::PCA")
-      ncp <- max(2, min(10, ncol(scaled_mat), nrow(scaled_mat) - 1))
+      n_active <- sum(!is_supp)
+      ind_sup  <- if (any(is_supp)) which(is_supp) else NULL
+      ncp      <- max(2, min(10, ncol(scaled_mat), n_active - 1))
       res <- FactoMineR::PCA(scaled_mat, graph = FALSE,
-                             scale.unit = do_scale, ncp = ncp)
+                             scale.unit = do_scale, ncp = ncp,
+                             ind.sup = ind_sup)
       
       incProgress(0.20, detail = "Preparing loadings")
       res
@@ -3695,41 +4431,131 @@ server <- function(input, output, session) {
   })
   
   # Shared PCA plot reactive (used by renderPlot and bulk export)
-  pca_plot_obj <- reactive({
+  # Manual ggplot2 build (rather than factoextra::fviz_pca_ind) so we have full
+  # control over the legend — specifically, so "iQC" can appear as a real,
+  # colour-coded legend entry even though it's a supplementary group — and so
+  # sample-ID labels and font size can be toggled cleanly for both the on-screen
+  # plot and PNG/SVG export.
+  .build_pca_plot <- function(fsz = 14, show_labels = FALSE) {
     req(pca_result(), pca_data())
-    sample_names <- rownames(pca_data())
-    is_iqc <- is_iqc_sample(sample_names)
+    
+    res      <- pca_result()
+    mat_pca  <- pca_data()
+    is_supp  <- attr(mat_pca, "is_supp")
+    if (is.null(is_supp)) is_supp <- rep(FALSE, nrow(mat_pca))
+    sample_names <- rownames(mat_pca)
+    
     orig_grp <- pca_groups()
-    if (length(orig_grp) == 0) orig_grp <- rep("Other", length(sample_names))
-    grp <- ifelse(is_iqc, "iQC", as.character(orig_grp))
-    grp <- factor(grp, levels = unique(c(sort(setdiff(unique(grp), "iQC")), "iQC")))
-    n_other <- length(setdiff(levels(grp), "iQC"))
-    dynamic_palette <- scales::hue_pal()(n_other)
-    names(dynamic_palette) <- setdiff(levels(grp), "iQC")
-    palette <- c(dynamic_palette, iQC = "#444444")
-    factoextra::fviz_pca_ind(
-      pca_result(),
-      geom.ind = "point",
-      pointshape = 16,
-      pointsize = 4,
-      habillage = grp,
-      addEllipses = FALSE,
-      mean.point = FALSE,
-      repel = TRUE,
-      legend.title = "Group"
-    ) +
-      ggplot2::scale_color_manual(values = palette) +
-      ggplot2::theme_minimal(base_size = 14) +
+    if (length(orig_grp) != length(sample_names)) orig_grp <- rep("Other", length(sample_names))
+    
+    active_coord <- as.data.frame(res$ind$coord[, 1:2, drop = FALSE])
+    colnames(active_coord) <- c("Dim1", "Dim2")
+    active_coord$Sample <- sample_names[!is_supp]
+    active_coord$Group  <- as.character(orig_grp[!is_supp])
+    active_coord$Type   <- "Active"
+    
+    has_supp <- any(is_supp) && !is.null(res$ind.sup)
+    plot_df  <- active_coord
+    
+    if (has_supp) {
+      supp_coord <- as.data.frame(res$ind.sup$coord[, 1:2, drop = FALSE])
+      colnames(supp_coord) <- c("Dim1", "Dim2")
+      supp_names <- sample_names[is_supp]
+      supp_coord$Sample <- supp_names
+      supp_coord$Group  <- dplyr::case_when(
+        is_iqc_sample(supp_names)  ~ "iQC",
+        is_istd_sample(supp_names) ~ "ISTD",
+        TRUE ~ "Other (supp.)"
+      )
+      supp_coord$Type <- "Supplementary"
+      plot_df <- dplyr::bind_rows(plot_df, supp_coord)
+    }
+    
+    supp_levels <- if (has_supp) intersect(c("iQC", "ISTD", "Other (supp.)"), unique(plot_df$Group)) else character(0)
+    grp_levels  <- c(sort(unique(active_coord$Group)), supp_levels)
+    plot_df$Group <- factor(plot_df$Group, levels = grp_levels)
+    
+    supp_colours <- c(iQC = "#444444", ISTD = "#d9822b", `Other (supp.)` = "#999999")
+    palette <- scales::hue_pal()(length(setdiff(grp_levels, names(supp_colours))))
+    names(palette) <- setdiff(grp_levels, names(supp_colours))
+    palette <- c(palette, supp_colours[intersect(names(supp_colours), grp_levels)])
+    
+    eig     <- res$eig
+    pc1_pct <- round(eig[1, 2], 1)
+    pc2_pct <- round(eig[2, 2], 1)
+    
+    p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = Dim1, y = Dim2, colour = Group, shape = Type)) +
+      ggplot2::geom_hline(yintercept = 0, colour = "grey85", linewidth = 0.3) +
+      ggplot2::geom_vline(xintercept = 0, colour = "grey85", linewidth = 0.3) +
+      ggplot2::geom_point(size = 4, alpha = 0.9) +
+      ggplot2::scale_colour_manual(values = palette) +
+      ggplot2::scale_shape_manual(values = c(Active = 16, Supplementary = 17), guide = "none") +
+      ggplot2::labs(
+        x      = paste0("Dim1 (", pc1_pct, "%)"),
+        y      = paste0("Dim2 (", pc2_pct, "%)"),
+        colour = "Group"
+      ) +
+      ggplot2::theme_minimal(base_size = fsz) +
       ggplot2::theme(
-        legend.position = "right",
+        legend.position  = "right",
         panel.grid.minor = ggplot2::element_blank()
       )
-  })
+    
+    if (has_supp) {
+      p <- p + ggplot2::labs(caption = "Triangles = supplementary points (iQC/ISTD); projected after fitting, so they never influenced the PCA axes.")
+    }
+    
+    if (isTRUE(show_labels)) {
+      p <- p + ggrepel::geom_text_repel(
+        ggplot2::aes(label = Sample),
+        size = fsz / 4, show.legend = FALSE, max.overlaps = Inf
+      )
+    }
+    
+    p
+  }
   
   output$pcaPlot <- renderPlot({
-    req(pca_plot_obj())
-    pca_plot_obj()
+    .build_pca_plot(input$pca_export_fontsize %||% 14, isTRUE(input$pca_show_labels))
   })
+  
+  .pca_export_dims <- function() {
+    px_w  <- input$pca_export_width  %||% 1200
+    px_h  <- input$pca_export_height %||% 900
+    dpi   <- input$pca_export_dpi    %||% 300
+    scale <- input$pca_export_scale  %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+  
+  output$download_pca_png <- downloadHandler(
+    filename = function() paste0("pca_plot_", Sys.Date(), ".png"),
+    content = function(file) {
+      dims <- isolate(.pca_export_dims())
+      fsz  <- isolate(input$pca_export_fontsize %||% 14)
+      lbl  <- isolate(isTRUE(input$pca_show_labels))
+      p    <- isolate(.build_pca_plot(fsz, lbl))
+      validate(need(!is.null(p), "No plot to export."))
+      ggplot2::ggsave(file, plot = p,
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
+    }
+  )
+  
+  output$download_pca_svg <- downloadHandler(
+    filename = function() paste0("pca_plot_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.pca_export_dims())
+      fsz  <- isolate(input$pca_export_fontsize %||% 14)
+      lbl  <- isolate(isTRUE(input$pca_show_labels))
+      p    <- isolate(.build_pca_plot(fsz, lbl))
+      validate(need(!is.null(p), "No plot to export."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
+    }
+  )
   
   
   output$pcaLoadingsTable <- renderDT({
