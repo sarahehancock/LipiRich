@@ -1,0 +1,22 @@
+ISTD,amount,units
+PS 34:0|PS 17:0_17:0 [IS],100,pmol
+PG 34:0|PG 17:0_17:0 [IS],100,pmol
+PE 34:0|PE 17:0_17:0 [IS],100,pmol
+PA 34:0|PA 17:0_17:0 [IS],100,pmol
+PC 38:0|PC 19:0_19:0 [IS],100,pmol
+CL 56:0|CL 14:0_14:0_14:0_14:0 [IS],100,pmol
+PI 15:0_18:1(d7) [IS],50,pmol
+LPE 14:0 [IS],100,pmol
+LPC 17:0/0:0 [IS],100,pmol
+Cer 35:1;O2|Cer 18:1;O2/17:0 [IS],100,pmol
+SM 30:0;O2 [IS],100,pmol
+CE 22:1 [IS],100,pmol
+PS 34:0 [IS],100,pmol
+PC 38:0 [IS],100,pmol
+CL 56:0|CL 28:0_28:0 [IS],100,pmol
+d5 TG 48:0 [IS],100,pmol
+Hex2Cer 30:1;O2|Hex2Cer 18:1;O2/12:0 [IS],10,pmol
+HexCer 33:1;O2|HexCer 18:1;O2/15:0 [IS],10,pmol
+NAE 17:1 [IS],5,pmol
+DG(15:0/15:0/0:0) [IS],100,pmol
+d3-Ac(16:0) [IS],10,pmol

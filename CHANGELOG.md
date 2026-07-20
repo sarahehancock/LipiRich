@@ -4,6 +4,24 @@
 
 ---
 
+## [Unreleased]
+
+### Added
+
+#### Demo dataset
+Added a full demonstration dataset to `demo_data/`, generated from mouse liver samples (n = 8 per group: chow, lard-based high-fat diet, 90% fish oil high-fat diet):
+
+- `liver_pos.txt` / `liver_neg.txt` — MS-DIAL 5 aligned output, positive and negative ion mode, ready for direct upload
+- `liver_metadata.xlsx` — combined reference workbook (sample order/analytical run, protein content, internal standard amounts)
+- `liver_protein.csv` / `liver_ISTD_amounts.csv` — protein and internal standard files, formatted for direct upload to LipiRich
+- `liver_MSDIAL_processing_parameters_pos.mdparameter` / `..._neg.mdparameter` — MS-DIAL 5 parameters used to generate the aligned output, for reproducing the alignment from raw data
+
+The original LC-MS `.raw` files are archived separately on Zenodo (DOI: 10.5281/zenodo.21448733) due to size. README updated with a full description of the demo dataset and repository structure.
+
+No changes to `app.R`; version remains 0.1.0.
+
+---
+
 ## [0.1.0] — 2026-07-20
 
 ### New features

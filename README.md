@@ -339,12 +339,24 @@ PNG and SVG formats are available on all plot tabs. The Statistics tab additiona
 
 ## Demo Data
 
-A demonstration dataset compatible with LipiRich is available at:
+A full demonstration dataset is available in [`demo_data/`](demo_data/), generated from mouse liver samples (n = 8 per group: chow, lard-based high-fat diet, and 90% fish oil high-fat diet). Animal and diet details are as previously described (Liu et al. 2014, *Scientific Reports* 4:5538).
 
-> **[Link pending]** — example MS-DIAL 5 aligned output files (.txt) for positive and negative ion mode.
+| File | Description |
+|---|---|
+| `liver_pos.txt` | MS-DIAL 5 aligned output, positive ion mode |
+| `liver_neg.txt` | MS-DIAL 5 aligned output, negative ion mode |
+| `liver_metadata.xlsx` | Combined reference workbook: sample order/analytical run order, protein content, and internal standard amounts (three sheets) |
+| `liver_protein.csv` | Protein content per sample, formatted for direct upload to LipiRich's protein normalisation step |
+| `liver_ISTD_amounts.csv` | Internal standard amounts, formatted for direct upload to LipiRich |
+| `liver_MSDIAL_processing_parameters_pos.mdparameter` | MS-DIAL 5 processing parameters used to generate `liver_pos.txt` |
+| `liver_MSDIAL_processing_parameters_neg.mdparameter` | MS-DIAL 5 processing parameters used to generate `liver_neg.txt` |
 
-The raw data used to generate the demo files is publicly available via the MS-DIAL 5 tutorial repository on Zenodo:
-- DOI: [10.5281/zenodo.10616947](https://doi.org/10.5281/zenodo.10616947)
+To try LipiRich immediately, upload `liver_pos.txt` and `liver_neg.txt` directly (Step 1), then `liver_protein.csv` and `liver_ISTD_amounts.csv` at the relevant normalisation steps.
+
+**Raw instrument data:** The original LC-MS `.raw` files from which the above were generated in MS-DIAL 5 are archived separately due to size:
+- DOI: [10.5281/zenodo.21448733](https://doi.org/10.5281/zenodo.21448733)
+
+The `.mdparameter` files above can be used to reproduce the exact MS-DIAL 5 alignment from these raw files.
 
 ---
 
@@ -358,7 +370,14 @@ LipiRich/
 ├── README.md        # This file
 ├── CHANGELOG.md     # Version history
 ├── LICENSE          # GNU Affero General Public License v3.0
-└── demo_data/       # Example input files (coming soon)
+└── demo_data/       # Example input files
+    ├── liver_pos.txt
+    ├── liver_neg.txt
+    ├── liver_metadata.xlsx
+    ├── liver_protein.csv
+    ├── liver_ISTD_amounts.csv
+    ├── liver_MSDIAL_processing_parameters_pos.mdparameter
+    └── liver_MSDIAL_processing_parameters_neg.mdparameter
 ```
 
 ---
