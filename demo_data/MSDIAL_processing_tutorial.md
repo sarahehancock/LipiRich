@@ -1,4 +1,4 @@
-# Preparing Demo Data in MS-DIAL for LipiRich
+# Processing Demo Data in MS-DIAL for LipiRich
 
 A step-by-step walkthrough of how to analyse the demo data provided in the [LipiRich GitHub repository](https://github.com/sarahehancock/LipiRich) using MS-DIAL 5, ready for import into LipiRich. Demo data were generated from mouse liver samples (n = 8 per group: chow, lard-based high-fat diet, and 90% fish oil high-fat diet). Animal and diet details are as previously described (Liu et al., 2014, *Scientific Reports* 4:5538, https://doi.org/10.1038/srep05538). Lipid extraction and LC-MS acquisition parameters are described in the Zenodo repository, DOI: [10.5281/zenodo.21448733](https://doi.org/10.5281/zenodo.21448733).
 
