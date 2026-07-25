@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.1.0
+# LipiRich v0.2.0
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -40,7 +40,7 @@
 # Tested with: MS-DIAL 5.5.251021, R 4.5.2, Bioconductor 3.22
 # --------------------------
 
-APP_VERSION <- "0.1.0"
+APP_VERSION <- "0.2.0"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -140,17 +140,20 @@ build_group_map <- function(df) {
   cgroup  <- pick_col(df, c("group","Group","condition","Condition"))
   cA      <- pick_col(df, c("factorA","FactorA","A","GroupA"))
   cB      <- pick_col(df, c("factorB","FactorB","B","GroupB"))
+  cBio    <- pick_col(df, c("bio_sample","biological_sample","biol_sample",
+                            "parent_sample","BioSample","ParentSample","biosample"))
   
   validate(need(!is.na(csample) && !is.na(cgroup),
                 "CSV must contain at least 'sample' and 'group' columns."))
   
-  key  <- canonicalize_sample(df[[csample]])
-  gmap <- setNames(as.character(df[[cgroup]]), key)
-  amap <- if (!is.na(cA)) setNames(as.character(df[[cA]]), key) else NULL
-  bmap <- if (!is.na(cB)) setNames(as.character(df[[cB]]), key) else NULL
+  key    <- canonicalize_sample(df[[csample]])
+  gmap   <- setNames(as.character(df[[cgroup]]), key)
+  amap   <- if (!is.na(cA))   setNames(as.character(df[[cA]]),   key) else NULL
+  bmap   <- if (!is.na(cB))   setNames(as.character(df[[cB]]),   key) else NULL
+  biomap <- if (!is.na(cBio)) setNames(as.character(df[[cBio]]), key) else NULL
   
-  list(group = gmap, factorA = amap, factorB = bmap,
-       colnames = list(sample = csample, group = cgroup, factorA = cA, factorB = cB))
+  list(group = gmap, factorA = amap, factorB = bmap, bio_sample = biomap,
+       colnames = list(sample = csample, group = cgroup, factorA = cA, factorB = cB, bio_sample = cBio))
 }
 
 # ---- Labelers that prefer the uploaded CSV, else fallback to your existing methods ----
@@ -538,7 +541,7 @@ landing_page_ui <- function() {
           div(class = "workflow-card",
               div(class = "step-num", "Step 3"),
               div(class = "step-title", "Normalisation"),
-              div(class = "step-desc", "Background subtraction using blank samples, followed by IS-based quantitative normalisation.")
+              div(class = "step-desc", "Background subtraction using blank samples, followed by IS-based quantitative normalisation, with optional unit-aware protein normalisation.")
           ),
           div(class = "workflow-card",
               div(class = "step-num", "Step 4–5"),
@@ -618,6 +621,14 @@ landing_page_ui <- function() {
           " (and optional ", tags$code("factorA"), "/", tags$code("factorB"), " for two-way designs) to assign groups explicitly."
       ),
       
+      div(class = "info-box",
+          tags$strong("Technical replicates: "), "If your run includes multiple technical injections per",
+          " biological sample, LipiRich can average them together before PCA, statistics, and every downstream",
+          " plot. Identify the parent biological sample via a ", tags$code("bio_sample"), " column in the grouping",
+          " CSV, or by selecting sample-name token(s) in the Group Preview tab — including datasets where bio and",
+          " tech replicate indices are combined in one token (e.g. ", tags$code("1-1"), " for bio 1, tech 1)."
+      ),
+      
       # ── Access options ──
       tags$h2("Access LipiRich"),
       div(class = "pub-grid",
@@ -669,7 +680,7 @@ landing_page_ui <- function() {
       tags$p("If you use LipiRich in your research, please cite:"),
       div(class = "cite-box",
           "Hancock, SE. (2026). LipiRich: A Shiny application for normalisation,
-statistics, and visualisation of MS-DIAL lipidomics data (v0.1.0).
+statistics, and visualisation of MS-DIAL lipidomics data (v0.2.0).
 GitHub: https://github.com/sarahehancock/LipiRich
 DOI: [pending]"
       ),
@@ -752,10 +763,24 @@ ui <- fluidPage(
         "Apply protein normalisation",
         value = FALSE
       ),
+      conditionalPanel(
+        condition = "input.use_protein_norm == true",
+        selectInput(
+          "protein_units",
+          "Protein units (as uploaded in CSV):",
+          choices  = c("\u00b5g" = "ug", "mg" = "mg", "g" = "g"),
+          selected = "mg"
+        ),
+        helpText(tags$small(
+          "Used only to label the y-axis correctly (e.g. \u2018pmol/mg protein\u2019).",
+          " It does not rescale your uploaded protein values \u2014 make sure the CSV",
+          " values are already in the unit selected here."
+        ))
+      ),
       verbatimTextOutput("protein_csv_summary"),
       fileInput(
         inputId = "group_csv",
-        label   = "Upload grouping CSV (sample, group[, factorA, factorB])",
+        label   = "Upload grouping CSV (sample, group[, factorA, factorB, bio_sample])",
         multiple = FALSE,
         accept   = c(".csv"),
         buttonLabel = "Browse..."
@@ -765,8 +790,37 @@ ui <- fluidPage(
         "Use uploaded CSV for grouping (and factors)",
         value = TRUE
       ),
-      helpText("CSV must contain columns 'sample' and 'group'; optional 'factorA', 'factorB'. Matching is case-insensitive on canonicalized sample names."),
+      helpText("CSV must contain columns 'sample' and 'group'; optional 'factorA', 'factorB', 'bio_sample'. Matching is case-insensitive on canonicalized sample names."),
       verbatimTextOutput("group_csv_summary"),
+      tags$hr(),
+      # ── Technical replicate averaging ───────────────────────────────────────
+      tags$h4("Technical replicates (optional)"),
+      helpText(tags$small(
+        "If your dataset includes multiple technical injections per biological sample,",
+        " average them before PCA, statistics, and downstream plots. Identify the parent",
+        " biological sample either via a ", tags$code("bio_sample"), " column in the grouping",
+        " CSV above, or by selecting sample-name token(s) in the ",
+        tags$strong("Group Preview"), " tab (a bio/tech sub-delimiter option there handles",
+        " composite tokens like ", tags$code("1-1"), " for bio 1, tech 1)."
+      )),
+      checkboxInput(
+        "use_tech_rep_avg",
+        "Average technical replicates before analysis",
+        value = FALSE
+      ),
+      conditionalPanel(
+        condition = "input.use_tech_rep_avg == true",
+        radioButtons(
+          "tech_rep_source",
+          "Identify technical reps via:",
+          choices  = c("Grouping CSV column ('bio_sample')" = "csv",
+                       "Sample-name token(s)"                = "token"),
+          selected = "token"
+        ),
+        helpText(tags$small(
+          "iQC, ISTD, and Blank samples are never averaged \u2014 each injection is kept separate."
+        ))
+      ),
       tags$hr(),
       # ── Token-based grouping ──────────────────────────────────────────────────
       tags$h4("Sample name parsing"),
@@ -927,7 +981,30 @@ ui <- fluidPage(
                        "Only used when two-way ANOVA is selected in Statistics."
                      )),
                      uiOutput("lr_factorA_selector_ui"),
-                     uiOutput("lr_factorB_selector_ui")
+                     uiOutput("lr_factorB_selector_ui"),
+                     tags$hr(),
+                     # ── Technical replicate parent sample ──────────────────────────
+                     h5("Technical replicate parent sample (optional)"),
+                     helpText(tags$small(
+                       "Select token position(s) that identify the biological/parent sample",
+                       " (i.e. excluding the replicate-index token, e.g. tokens 1+2 from",
+                       " KO_treated_rep1 \u2192 KO_treated). Used when \u2018Average technical",
+                       " replicates\u2019 is enabled in the sidebar."
+                     )),
+                     uiOutput("lr_techrep_token_selector_ui"),
+                     textInput(
+                       "lr_techrep_subdelim",
+                       "Bio/tech sub-delimiter within token (optional)",
+                       value = "",
+                       placeholder = "e.g. - for '1-1' meaning bio 1, tech 1"
+                     ),
+                     helpText(tags$small(
+                       "Use this if a single token encodes both the biological and technical",
+                       " replicate together, e.g. ", tags$code("1-1"), " = bio rep 1, tech rep 1.",
+                       " Enter the separator (", tags$code("-"), " in that example) and only the",
+                       " part ", tags$strong("before"), " it is kept as the biological replicate",
+                       " index. Leave blank if your tech-rep token doesn't need splitting."
+                     ))
                    )
             ),
             column(width = 8,
@@ -1658,12 +1735,10 @@ ui <- fluidPage(
                                    choices = c("Quantified (IS-normalised)" = "norm",
                                                "Background-subtracted"      = "value_bs"),
                                    selected = "norm"),
-                       selectInput("cbp_units", "Units",
-                                   choices = c("pmol" = "pmol",
-                                               "nmol" = "nmol",
-                                               "pmol/mg protein" = "pmol_mg",
-                                               "nmol/mg protein" = "nmol_mg"),
-                                   selected = "pmol"),
+                       helpText(tags$small(
+                         "Units are detected automatically from your ISTD CSV and,",
+                         " if enabled, your protein normalisation settings."
+                       )),
                        hr(),
                        h5("Filtering"),
                        checkboxInput("cbp_sig_only", "Show significant species only", value = FALSE),
@@ -2309,6 +2384,23 @@ server <- function(input, output, session) {
     )
   })
   
+  # Technical replicate parent-sample token selector (Group Preview tab)
+  output$lr_techrep_token_selector_ui <- renderUI({
+    choices <- .token_choices()
+    if (is.null(choices)) {
+      return(helpText(tags$small(style = "color:#888;",
+                                 "Click 'Preview tokens' to populate token positions.")))
+    }
+    prev <- isolate(input$lr_techrep_token)
+    sel  <- if (!is.null(prev) && length(prev) > 0 && all(as.character(prev) %in% choices))
+      as.character(prev) else character(0)
+    checkboxGroupInput("lr_techrep_token",
+                       label    = "Biological-sample token(s) — select one or more to combine",
+                       choices  = choices,
+                       selected = sel,
+                       inline   = TRUE)
+  })
+  
   # PCA and Stats group token UIs — read-only mirrors (editing happens in Group Preview only)
   # Rendering a second checkboxGroupInput with the same ID causes Shiny to duplicate values.
   # Instead show a text summary of the current selection.
@@ -2416,6 +2508,72 @@ server <- function(input, output, session) {
       else rep(NA_character_, length(samples))
       
       list(group = grp, factorA = fA, factorB = fB)
+    }
+  })
+  
+  # ── Central technical-replicate parent-sample reactive — single source of truth ─
+  # Returns a function(samples) -> character vector of "biological/parent sample"
+  # labels, one per input sample. Priority: grouping-CSV 'bio_sample' column (if
+  # selected & present) > sample-name token(s) selected in Group Preview > sample
+  # itself unchanged (i.e. no collapsing).
+  get_active_tech_rep_map <- reactive({
+    function(samples) {
+      samples <- as.character(samples)
+      n <- length(samples)
+      if (n == 0) return(character(0))
+      
+      # 1. CSV column, if that source is selected and the column exists
+      if (identical(input$tech_rep_source, "csv") &&
+          isTRUE(input$use_group_csv) && !is.null(input$group_csv)) {
+        gm <- tryCatch(group_map(), error = function(e) NULL)
+        if (!is.null(gm) && !is.null(gm$bio_sample)) {
+          bio <- labels_from_map(samples, gm$bio_sample)
+          missing <- is.na(bio) | !nzchar(bio)
+          bio[missing] <- samples[missing]
+          return(bio)
+        }
+        # No bio_sample column in the CSV — fall through to token method below
+      }
+      
+      # 2. Sample-name token(s)
+      delim <- input$lr_delimiter %||% "_"
+      if (!nzchar(delim)) delim <- "_"
+      sep <- input$lr_group_sep %||% "_"
+      
+      tok <- input$lr_techrep_token
+      if (!is.null(tok) && length(tok) > 0) {
+        tok_int <- suppressWarnings(as.integer(tok))
+        tok_int <- tok_int[!is.na(tok_int) & is.finite(tok_int)]
+      } else {
+        tok_int <- integer(0)
+      }
+      
+      if (length(tok_int) > 0) {
+        subdelim <- input$lr_techrep_subdelim %||% ""
+        if (nzchar(subdelim)) {
+          # A single token encodes both bio & tech rep together (e.g. "1-1" = bio 1,
+          # tech 1). Extract each selected token individually, keep only the part
+          # before the sub-delimiter (the biological replicate index), then combine.
+          bio_part_for <- function(tok_idx) {
+            raw <- extract_token(samples, delimiter = delim, token_index = tok_idx)
+            out <- stringr::str_split_fixed(raw, stringr::fixed(subdelim), 2)[, 1]
+            out[is.na(raw)] <- NA_character_
+            out
+          }
+          parts_mat <- vapply(tok_int, bio_part_for, character(length(samples)))
+          if (is.null(dim(parts_mat))) parts_mat <- matrix(parts_mat, ncol = length(tok_int))
+          bio <- apply(parts_mat, 1, function(r) paste(r[nzchar(r) & !is.na(r)], collapse = sep))
+        } else {
+          bio <- extract_combined_tokens(samples, delimiter = delim,
+                                         token_indices = tok_int, sep = sep)
+        }
+      } else {
+        # No token selected — each sample is its own biological sample (no averaging)
+        bio <- samples
+      }
+      missing <- is.na(bio) | !nzchar(bio)
+      bio[missing] <- samples[missing]
+      bio
     }
   })
   
@@ -3278,6 +3436,7 @@ server <- function(input, output, session) {
     # ── Force Shiny to track protein norm toggle unconditionally ─────────────
     use_prot      <- isTRUE(input$use_protein_norm)
     prot_csv_file <- input$protein_csv            # register as dependency
+    prot_units_in <- input$protein_units           # register as dependency
     prot_data     <- if (use_prot && !is.null(prot_csv_file))
       tryCatch(protein_df(), error = function(e) NULL)
     else NULL
@@ -3286,6 +3445,15 @@ server <- function(input, output, session) {
       prot_join <- prot_data %>%
         dplyr::mutate(sample_norm = normalize_sample_name(sample)) %>%
         dplyr::select(sample_norm, protein)
+      # Label appended to norm_units so downstream y-axis labels are accurate
+      # (e.g. "pmol" -> "pmol/mg protein", "nmol" -> "nmol/ug protein").
+      protein_unit_label <- switch(
+        prot_units_in %||% "mg",
+        "ug" = "ug protein",
+        "mg" = "mg protein",
+        "g"  = "g protein",
+        "mg protein"
+      )
       df_res <- df_res %>%
         dplyr::left_join(prot_join, by = "sample_norm") %>%
         dplyr::mutate(
@@ -3293,7 +3461,12 @@ server <- function(input, output, session) {
                                     norm     / protein, norm),
           value_bs = dplyr::if_else(!is.na(value_bs) & !is.na(protein) & protein > 0,
                                     value_bs / protein, value_bs),
-          protein_norm_applied = !is.na(protein)
+          protein_norm_applied = !is.na(protein),
+          norm_units = dplyr::if_else(
+            protein_norm_applied & !is.na(norm_units) & nzchar(norm_units),
+            paste0(norm_units, "/", protein_unit_label),
+            norm_units
+          )
         ) %>%
         dplyr::select(-protein)
     }
@@ -3585,6 +3758,58 @@ server <- function(input, output, session) {
     df
   })
   
+  # ---------- Technical replicate averaging ----------
+  # Collapses multiple technical-injection rows down to one row per
+  # (feature x biological sample) by averaging the numeric measurement
+  # columns, when the "Average technical replicates" toggle is on. iQC,
+  # ISTD, and Blank samples are always passed through untouched — each
+  # injection is a distinct QC event and should never be averaged away.
+  bg_norm_long_avg <- reactive({
+    df <- bg_norm_long_resolved()
+    
+    if (!isTRUE(input$use_tech_rep_avg)) return(df)
+    
+    fn  <- get_active_tech_rep_map()
+    bio <- fn(df$sample)
+    
+    protect <- is_protected_sample(df$sample)
+    df$bio_sample <- dplyr::if_else(protect, df$sample, bio)
+    
+    # Nothing to collapse (no CSV column / no token selected) — skip the group-by
+    if (all(df$bio_sample == df$sample)) {
+      df$bio_sample <- NULL
+      return(df)
+    }
+    
+    id_cols <- intersect(
+      c("Average Rt(min)", "Average Mz", "Metabolite name", "Adduct type",
+        "class", "ion.mode", "plot_class", "mode", "istd_name"),
+      names(df)
+    )
+    avg_cols <- intersect(
+      c("value", "blank_value", "value_bs", "IS_value", "norm",
+        "norm_raw", "value_bs_raw"),
+      names(df)
+    )
+    other_cols <- setdiff(names(df), c(id_cols, avg_cols, "sample", "sample_norm", "bio_sample"))
+    
+    safe_mean <- function(x) if (all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE)
+    safe_first <- function(x) { x <- x[!is.na(x)]; if (length(x) == 0) NA else x[1] }
+    
+    df_avg <- df %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(id_cols)), bio_sample) %>%
+      dplyr::summarise(
+        dplyr::across(dplyr::all_of(avg_cols), safe_mean),
+        dplyr::across(dplyr::all_of(other_cols), safe_first),
+        n_tech_reps = dplyr::n(),
+        .groups = "drop"
+      ) %>%
+      dplyr::rename(sample = bio_sample) %>%
+      dplyr::mutate(sample_norm = normalize_sample_name(sample))
+    
+    df_avg
+  })
+  
   # ---------- IS classes & plots ----------
   is_classes_available <- reactive({
     req(bg_norm_long())
@@ -3687,15 +3912,15 @@ server <- function(input, output, session) {
   
   # ---------- Classes for plots and export ----------
   met_classes_available <- reactive({
-    req(bg_norm_long_resolved())
-    bg_norm_long_resolved() %>%
+    req(bg_norm_long_avg())
+    bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::distinct(plot_class) %>%
       dplyr::arrange(plot_class) %>%
       dplyr::pull(plot_class)
   })
   
-  observeEvent(bg_norm_long_resolved(), {
+  observeEvent(bg_norm_long_avg(), {
     updateSelectInput(
       session, "met_class",
       choices  = met_classes_available(),
@@ -3711,8 +3936,8 @@ server <- function(input, output, session) {
   }, ignoreInit = FALSE)
   
   met_names_available <- reactive({
-    req(bg_norm_long_resolved(), input$met_class)
-    bg_norm_long_resolved() %>%
+    req(bg_norm_long_avg(), input$met_class)
+    bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::filter(plot_class == input$met_class) %>%
       dplyr::distinct(`Metabolite name`) %>%
@@ -3732,8 +3957,8 @@ server <- function(input, output, session) {
   # ── Adduct filter reactives ────────────────────────────────────────────────────
   # Returns adducts available for the current class in the normalised data
   met_adducts_available <- reactive({
-    req(bg_norm_long_resolved(), input$met_class)
-    adducts <- bg_norm_long_resolved() %>%
+    req(bg_norm_long_avg(), input$met_class)
+    adducts <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"),
                     plot_class == input$met_class) %>%
       dplyr::distinct(`Adduct type`) %>%
@@ -3742,8 +3967,8 @@ server <- function(input, output, session) {
   })
   
   class_all_adducts_available <- reactive({
-    req(bg_norm_long_resolved(), input$class_all)
-    adducts <- bg_norm_long_resolved() %>%
+    req(bg_norm_long_avg(), input$class_all)
+    adducts <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"),
                     plot_class == input$class_all) %>%
       dplyr::distinct(`Adduct type`) %>%
@@ -3768,13 +3993,13 @@ server <- function(input, output, session) {
   
   met_plot_data <- reactive({
     req(
-      bg_norm_long_resolved(),
+      bg_norm_long_avg(),
       input$met_class, input$met_name,
       input$plot_value_type_met, input$display_mode_met
     )
     
     # --- Base DF: resolve blanks & select class, exclude IS
-    df <- bg_norm_long_resolved() %>%
+    df <- bg_norm_long_avg() %>%
       dplyr::mutate(
         sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample))
       )
@@ -3914,7 +4139,7 @@ server <- function(input, output, session) {
   
   
   # ---------- Class (all metabolites) ----------
-  observeEvent(bg_norm_long_resolved(), {
+  observeEvent(bg_norm_long_avg(), {
     updateSelectInput(session, "class_all",
                       choices = met_classes_available(),
                       selected = if (length(met_classes_available()) > 0) met_classes_available()[1] else character(0))
@@ -3937,12 +4162,12 @@ server <- function(input, output, session) {
   }, ignoreInit = FALSE)
   
   class_all_plot_data <- reactive({
-    req(bg_norm_long_resolved(), input$class_all,
+    req(bg_norm_long_avg(), input$class_all,
         input$plot_value_type_all, input$display_mode_all)
     
     withProgress(message = "Building class plot…", value = 0, {
       incProgress(0.15, detail = "Filtering data")
-      df <- bg_norm_long_resolved() %>%
+      df <- bg_norm_long_avg() %>%
         dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
         dplyr::filter(plot_class == input$class_all) %>%
         dplyr::mutate(sample_norm = coalesce(sample_norm, normalize_sample_name(sample)))
@@ -4032,8 +4257,8 @@ server <- function(input, output, session) {
   
   # ---------- EXPORT ----------
   export_wide_data <- reactive({
-    req(bg_norm_long_resolved())
-    df <- bg_norm_long_resolved() %>%
+    req(bg_norm_long_avg())
+    df <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::mutate(sample_norm = coalesce(sample_norm, normalize_sample_name(sample)))
     
@@ -4079,7 +4304,7 @@ server <- function(input, output, session) {
     wide
   })
   
-  observeEvent(bg_norm_long_resolved(), {
+  observeEvent(bg_norm_long_avg(), {
     classes <- met_classes_available()
     updateCheckboxGroupInput(
       session,
@@ -4106,14 +4331,14 @@ server <- function(input, output, session) {
   # content of the biological samples — an assumed, not measured, value —
   # purely so the projection lands somewhere visually meaningful.
   pca_data <- reactive({
-    req(bg_norm_long_resolved())
+    req(bg_norm_long_avg())
     measure   <- req(input$pca_measure)
     units     <- req(input$pca_units)
     excl      <- isTRUE(input$exclude_blank_pca)
     show_iqc  <- isTRUE(input$pca_show_iqc)
     show_istd <- isTRUE(input$pca_show_istd)
     
-    df0 <- bg_norm_long_resolved() %>%
+    df0 <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"))
     
     # ── Group selection filter ────────────────────────────────────────────────
@@ -4723,7 +4948,7 @@ server <- function(input, output, session) {
                              paste0("Mean: ", signif(df_sum$mean, 5), "\nSEM: ", signif(df_sum$sem, 5))
     )
     df_pts$val_fmt <- signif(df_pts$value, 5)
-    pt_hover_text <- paste0("Metabolite: ", as.character(df_pts$`Metabolite name`), "\nValue: ", df_pts$val_fmt)
+    pt_hover_text <- paste0("Sample: ", as.character(df_pts$sample), "\nValue: ", df_pts$val_fmt)
     
     # Try ggplotly first
     p <- ggplot() +
@@ -4881,9 +5106,10 @@ server <- function(input, output, session) {
                              paste0("Mean: ", df_sum$mean_fmt, "\n", err_lab, ": ", df_sum$sem_fmt)
     )
     
-    # Points hover: metabolite name + value (you can add sample with paste0("Sample: ", df_pts$sample, ...))
+    # Points hover: sample name + metabolite name + value
     df_pts$val_fmt <- signif(df_pts$value, 5)
-    pt_hover_text  <- paste0("Metabolite: ", as.character(df_pts$`Metabolite name`),
+    pt_hover_text  <- paste0("Sample: ", as.character(df_pts$sample),
+                             "\nMetabolite: ", as.character(df_pts$`Metabolite name`),
                              "\nValue: ", df_pts$val_fmt)
     
     # --- Plot
@@ -4973,8 +5199,8 @@ server <- function(input, output, session) {
   }
   
   
-  observeEvent(bg_norm_long_resolved(), {
-    classes <- bg_norm_long_resolved() %>%
+  observeEvent(bg_norm_long_avg(), {
+    classes <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::distinct(plot_class) %>%
       dplyr::arrange(plot_class) %>%
@@ -4990,9 +5216,9 @@ server <- function(input, output, session) {
   
   
   observeEvent(input$stats_class, {
-    req(bg_norm_long_resolved(), input$stats_class)
+    req(bg_norm_long_avg(), input$stats_class)
     
-    base <- bg_norm_long_resolved() %>%
+    base <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"))
     
     mets <- if (identical(input$stats_class, "All classes")) {
@@ -5016,8 +5242,8 @@ server <- function(input, output, session) {
   
   # Build dataset to test
   stats_input_long <- reactive({
-    req(bg_norm_long_resolved(), input$stats_class, input$stats_value_type, input$stats_units)
-    df <- bg_norm_long_resolved() %>%
+    req(bg_norm_long_avg(), input$stats_class, input$stats_value_type, input$stats_units)
+    df <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       { if (!identical(input$stats_class, "All classes")) dplyr::filter(., plot_class == input$stats_class) else . } %>%
       dplyr::mutate(sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample)))
@@ -5394,7 +5620,7 @@ server <- function(input, output, session) {
   # ---- Per-class detection & significance summary ----
   class_stats_summary <- reactive({
     # Detected: all species in bg_norm_long_resolved (IS excluded)
-    df_all <- tryCatch(bg_norm_long_resolved(), error = function(e) NULL)
+    df_all <- tryCatch(bg_norm_long_avg(), error = function(e) NULL)
     if (is.null(df_all)) return(NULL)
     detected <- df_all %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
@@ -6219,8 +6445,8 @@ server <- function(input, output, session) {
   
   # ---- Base annotations used by both parsing modes ----
   lipid_annotations <- reactive({
-    req(bg_norm_long_resolved())
-    df <- bg_norm_long_resolved() %>%
+    req(bg_norm_long_avg())
+    df <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::distinct(`Metabolite name`, plot_class)
     
@@ -6572,8 +6798,8 @@ server <- function(input, output, session) {
   
   # ---- Base long DF aligned with your Statistics settings (for per-group) ----
   enrich_base_df <- reactive({
-    req(bg_norm_long_resolved())
-    df <- bg_norm_long_resolved() %>%
+    req(bg_norm_long_avg())
+    df <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::mutate(sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample)))
     
@@ -7213,8 +7439,8 @@ server <- function(input, output, session) {
   
   # Sum per sample × class, with unit option "absolute" or "% of total lipids"
   path_class_totals <- reactive({
-    req(bg_norm_long_resolved(), input$path_value_type, input$path_units)
-    df <- bg_norm_long_resolved() %>%
+    req(bg_norm_long_avg(), input$path_value_type, input$path_units)
+    df <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::mutate(sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample))) %>%
       filter_blanks(exclude = input$exclude_blank_path, sample_col = "sample_norm", exact = FALSE) 
@@ -7254,10 +7480,10 @@ server <- function(input, output, session) {
   
   # ---- Class totals + FA-filtered ether sub-class totals for scoring ----
   path_totals_extended <- reactive({
-    req(bg_norm_long_resolved(), input$path_value_type, input$path_units)
+    req(bg_norm_long_avg(), input$path_value_type, input$path_units)
     
     # Base long DF with chosen measure & blank handling (same as your pipeline)
-    df <- bg_norm_long_resolved() %>%
+    df <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::mutate(sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample))) %>%
       filter_blanks(exclude = input$exclude_blank_path, sample_col = "sample_norm", exact = FALSE) %>% 
@@ -7767,7 +7993,7 @@ server <- function(input, output, session) {
   # Class selector — sources classes from bg_norm_long_resolved so it is
   # populated as soon as data is loaded, not only after stats are run
   output$cbp_class_ui <- renderUI({
-    df <- tryCatch(bg_norm_long_resolved(), error = function(e) NULL)
+    df <- tryCatch(bg_norm_long_avg(), error = function(e) NULL)
     classes <- if (!is.null(df) && "plot_class" %in% names(df))
       sort(unique(df$plot_class[!stringr::str_detect(df$`Metabolite name`, "\\[IS\\]")]))
     else character(0)
@@ -7778,14 +8004,14 @@ server <- function(input, output, session) {
   
   # Core reactive: filtered species for the selected class
   cbp_data <- reactive({
-    req(bg_norm_long_resolved(), stats_results_all())
+    req(bg_norm_long_avg(), stats_results_all())
     # Use stats_results_all so all tested species are available regardless of
     # the significance filter; sig_only toggle is applied within this reactive
     res <- stats_results_all()
     validate(need(nrow(res) > 0, "No features for this class. Run statistics first."))
     
     # Build long df from bg_norm_long_resolved — same filtering as stats_input_long
-    df_long <- bg_norm_long_resolved() %>%
+    df_long <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::mutate(sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample)))
     df_long <- filter_blanks(df_long, input$exclude_blank_stats,
@@ -7801,11 +8027,29 @@ server <- function(input, output, session) {
       df_long <- df_long %>% dplyr::filter(group %in% sel_grps)
     }
     
-    # Value type — column names are "norm" and "value_bs" in bg_norm_long_resolved
+    # Value type — column names are "norm" and "value_bs" in bg_norm_long_avg
     measure_col <- if (identical(input$cbp_value_type %||% "norm", "value_bs")) "value_bs" else "norm"
     if (!measure_col %in% names(df_long)) measure_col <- names(df_long)[grep("^norm$|^value_bs$", names(df_long))[1]]
     df_long <- df_long %>%
       dplyr::mutate(value_plot = .data[[measure_col]])
+    
+    # Auto-detect the correct y-axis units from norm_units (set from the ISTD CSV,
+    # optionally suffixed with the protein unit when protein normalisation is on)
+    # rather than letting the user pick an arbitrary, possibly-mismatched label.
+    cbp_units_label <- NULL
+    if (identical(measure_col, "norm")) {
+      u <- stats::na.omit(unique(df_long$norm_units))
+      if (length(u) == 1) {
+        cbp_units_label <- u
+      } else if (length(u) > 1) {
+        showNotification(
+          "Class bar plot: multiple ISTD units detected across data (mixed units).",
+          type = "warning", duration = 6
+        )
+        cbp_units_label <- "(mixed units)"
+      }
+    }
+    cbp_ylab <- axis_label(kind = measure_col, mode = "absolute", unit_label = cbp_units_label)
     
     # Restrict to features present in stats results
     df_long <- df_long %>% dplyr::filter(`Metabolite name` %in% res$metabolite)
@@ -7871,7 +8115,7 @@ server <- function(input, output, session) {
     )
     
     list(df = df_long, res = res, sig_feats = sig_feats,
-         measure_col = measure_col, posthoc = ph_class)
+         measure_col = measure_col, posthoc = ph_class, ylab = cbp_ylab)
   })
   
   # Info text
@@ -7989,7 +8233,7 @@ server <- function(input, output, session) {
       ggplot2::scale_colour_manual(values = border_pal, guide = "none") +
       ggplot2::labs(
         x       = NULL,
-        y       = input$cbp_units %||% "pmol",
+        y       = d$ylab,
         caption = paste0("Error bars: ", err_type)
       ) +
       ggplot2::theme_minimal(base_size = fsz) +
@@ -8769,7 +9013,7 @@ server <- function(input, output, session) {
     # ── Build wide matrix for selected group ──────────────────────────────────
     measure_col <- pick_measure_col(input$net_value_type)
     
-    df <- bg_norm_long_resolved() %>%
+    df <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::mutate(sample_norm = dplyr::coalesce(sample_norm, normalize_sample_name(sample)))
     fn  <- get_active_grouping()

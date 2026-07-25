@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="v0.1.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.2.0-blue" alt="v0.2.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.5.2, and Bioconductor 3.22.
 
-> ⚠️ **Pre-publication software (v0.1.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.2.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -15,10 +15,11 @@
 | **Data import** | Upload 1–2 MS-DIAL aligned `.txt` files; positive and negative ion modes merged automatically |
 | **Ion mode deduplication** | Per-class mode preference rules (user-configurable) ensure each species is represented by its most informative ion mode |
 | **Internal standards** | QC plots and per-ISTD quantification; IS matched by class, ion mode, and adduct type |
-| **Normalisation** | Blank subtraction followed by IS-based quantitative normalisation, with optional protein normalisation |
+| **Normalisation** | Blank subtraction followed by IS-based quantitative normalisation, with optional protein normalisation (unit-aware) |
 | **Protein Match** | Diagnostic check confirming every imported sample has a matching protein CSV entry (and vice versa), before relying on protein normalisation |
+| **Technical Replicates** | Optional averaging of technical injections into one value per biological sample before PCA, statistics, and all downstream plots — identified via a grouping-CSV column or sample-name token(s) |
 | **Outlier Detection** | Sample-level (PCA Hotelling's T², iQC replicate deviation) and feature-level (modified Z-score / IQR) outlier flagging, with bulk and individual exclusion that propagates to every downstream tab |
-| **Visualisation** | Interactive bar plots per lipid species and per class, with adduct-type filtering |
+| **Visualisation** | Interactive bar plots per lipid species and per class, with adduct-type filtering; hovering over individual points shows the source sample name |
 | **Export** | Wide and long-format CSV export with class and unit filtering |
 | **PCA** | Principal component analysis with token-based group colouring, sample selection, and iQC/ISTD projected as supplementary (non-fit-influencing) points |
 | **Statistics** | Auto t-test / one-way ANOVA / two-way ANOVA with post-hoc tests, volcano plot, and significance heatmap |
@@ -31,6 +32,8 @@
 ---
 
 ## Getting Started
+
+> **New here?** The [step-by-step tutorial](TUTORIAL.md) walks through every tab using the bundled demo dataset.
 
 ### Option 1 — Use the live web app
 
@@ -162,8 +165,34 @@ To assign groups explicitly — particularly useful for complex experimental des
 | `group` | Yes | Group label for plots and statistics |
 | `factorA` | No | Factor A label for two-way ANOVA designs |
 | `factorB` | No | Factor B label for two-way ANOVA designs |
+| `bio_sample` | No | Parent biological sample ID, used for technical replicate averaging (see below) |
 
 When a grouping CSV is uploaded and enabled, it takes priority over token-based grouping across all tabs. Blank, iQC, and ISTD-named samples are automatically excluded from group selectors regardless of method.
+
+---
+
+## Technical Replicate Averaging
+
+If your dataset includes multiple technical injections per biological sample, LipiRich can average them together before PCA, statistics, and every downstream plot. Enable **Average technical replicates before analysis** in the sidebar, then identify the parent biological sample using one of two methods:
+
+### Grouping CSV column
+
+Add a `bio_sample` column to the grouping CSV described above, giving the same parent-sample ID to every technical replicate of a biological sample.
+
+### Sample-name token(s)
+
+In the **Group Preview** tab, select which token position(s) identify the parent biological sample — the same token table used for group and Factor A/B assignment:
+
+```
+KO_treated_rep1   →   token 1: KO    token 2: treated    token 3: rep1
+KO_treated_rep2   →   token 1: KO    token 2: treated    token 3: rep2
+```
+
+Selecting tokens 1+2 collapses both rows above into biological sample `KO_treated`.
+
+If a single token encodes both the biological and technical replicate together (e.g. `1-1` meaning bio replicate 1, tech replicate 1), enter the **bio/tech sub-delimiter** (`-` in that example) in the Group Preview tab. Only the portion before the sub-delimiter is kept as the biological replicate index, so `1-1` and `1-2` both collapse to biological sample `1`, while `2-1` remains distinct.
+
+iQC, ISTD, and Blank samples are never averaged — each injection is always kept as a separate row, regardless of this setting.
 
 ---
 
@@ -199,6 +228,8 @@ Optionally, normalise IS-normalised or background-subtracted values by per-sampl
 | `protein` | Numeric protein content per sample |
 
 Enable **Apply protein normalisation** in the sidebar to divide `norm`/`value_bs` by each sample's protein value. Samples with no matching protein CSV row are left un-normalised rather than dropped.
+
+When protein normalisation is enabled, select the **protein units** (µg, mg, or g) matching your uploaded CSV values. This does not rescale your data — it is used only to correctly label plot y-axes (e.g. `pmol/mg protein`, `nmol/ug protein`) throughout the app, including the Metabolite, Class-all, and Class Bar Plots tabs.
 
 ### Protein Match tab (Step 3a)
 
@@ -275,7 +306,7 @@ The Class Bar Plots tab displays all lipid species within a selected class as a 
 
 ### Controls
 
-**Data** — select a lipid class (populated immediately on data load), the value type (IS-normalised or background-subtracted), and the units for the y-axis label.
+**Data** — select a lipid class (populated immediately on data load) and the value type (IS-normalised or background-subtracted). The y-axis unit label is detected automatically from your ISTD CSV and protein normalisation settings, so it always matches what's actually plotted.
 
 **Filtering:**
 - **Show significant species only** — restricts the plot to species that passed the significance threshold. Reads from the full set of tested features so this toggle is always meaningful.
@@ -347,7 +378,7 @@ A full demonstration dataset is available in [`demo_data/`](demo_data/), generat
 | `Demo data neg.txt` | MS-DIAL 5 aligned output, negative ion mode |
 | `Demo data metadata.xlsx` | Combined reference workbook: sample order/analytical run order, protein content, and internal standard amounts (three sheets) |
 | `Demo data protein.csv` | Protein content per sample, formatted for direct upload to LipiRich's protein normalisation step |
-| `Demo data_ISTD_amounts.csv` | Internal standard amounts, formatted for direct upload to LipiRich |
+| `Demo data  ISTD_amounts.csv` | Internal standard amounts, formatted for direct upload to LipiRich |
 | `Processing parameters pos.mdparameter` | MS-DIAL 5 processing parameters used to generate `Demo data pos.txt` |
 | `Processing parameters neg.mdparameter` | MS-DIAL 5 processing parameters used to generate `Demo data neg.txt` |
 
@@ -356,7 +387,7 @@ To try LipiRich immediately, upload `Demo data pos.txt` and `Demo data neg.txt` 
 **Raw instrument data:** The original LC-MS `.raw` files from which the above were generated in MS-DIAL 5 are archived separately due to size:
 - DOI: [10.5281/zenodo.21448733](https://doi.org/10.5281/zenodo.21448733)
 
-The `.mdparameter` files above can be used to reproduce the exact MS-DIAL 5 alignment from these raw files. 
+The `.mdparameter` files above can be used to reproduce the exact MS-DIAL 5 alignment from these raw files. For a full walkthrough of this process, including peak curation and export, see the [MS-DIAL processing tutorial](demo_data/MSDIAL_processing_tutorial.md).
 
 ---
 
@@ -368,14 +399,19 @@ LipiRich/
 ├── packages.R       # R package installer (run once before first use)
 ├── Dockerfile       # Docker image definition
 ├── README.md        # This file
+├── TUTORIAL.md      # Step-by-step walkthrough with screenshots
 ├── CHANGELOG.md     # Version history
 ├── LICENSE          # GNU Affero General Public License v3.0
+├── docs/
+│   └── images/      # Screenshots for TUTORIAL.md
 └── demo_data/       # Example input files
+    ├── MSDIAL_processing_tutorial.md  # Raw data → MS-DIAL alignment walkthrough
+    ├── images/      # Screenshots for MSDIAL_processing_tutorial.md
     ├── Demo data pos.txt
     ├── Demo data neg.txt
     ├── Demo data metadata.xlsx
     ├── Demo data protein.csv
-    ├── Demo data_ISTD_amounts.csv
+    ├── Demo data ISTD_amounts.csv
     ├── Processing parameters pos.mdparameter
     └── Processing parameters neg.mdparameter
 ```
@@ -386,7 +422,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.1.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.2.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 
