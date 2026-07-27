@@ -4,20 +4,9 @@
 
 ---
 
-## [0.2.0] — 2026-07-25
+## [Unreleased]
 
 ### Added
-
-#### Technical replicate averaging
-A new sidebar toggle, **Average technical replicates before analysis**, collapses multiple technical-injection rows into a single value per biological sample (mean of `norm`/`value_bs`) before PCA, statistics, and every downstream plot (Heatmap, Enrichment, Correlation Network, Synthesis Pathways, Class Bar Plots, etc.). The parent biological sample can be identified two ways, matching whichever is more convenient for a given dataset:
-
-- **Grouping CSV column** — a new optional `bio_sample` column recognised by the existing grouping CSV upload.
-- **Sample-name token(s)** — a new token selector in the **Group Preview** tab, alongside the existing group/Factor A/Factor B selectors. A **bio/tech sub-delimiter** option handles sample names where bio and tech replicate indices are encoded together in one token (e.g. `1-1` = bio replicate 1, tech replicate 1) — only the portion before the sub-delimiter is kept as the biological replicate index.
-
-iQC, ISTD, and Blank samples are never averaged — each injection is always kept as a separate row regardless of this setting. A `n_tech_reps` count is retained per averaged row.
-
-#### Protein units selector
-A new **Protein units** dropdown (µg / mg / g) appears when protein normalisation is enabled, so the unit actually used in the uploaded protein CSV can be specified. This does not rescale the uploaded values — it only ensures y-axis labels are accurate throughout the app (e.g. `pmol/mg protein`, `nmol/ug protein`) instead of always assuming mg.
 
 #### Demo dataset
 Added a full demonstration dataset to `demo_data/`, generated from mouse liver samples (n = 8 per group: chow, lard-based high-fat diet, 90% fish oil high-fat diet):
@@ -29,15 +18,16 @@ Added a full demonstration dataset to `demo_data/`, generated from mouse liver s
 
 The original LC-MS `.raw` files are archived separately on Zenodo (DOI: 10.5281/zenodo.21448733) due to size. README updated with a full description of the demo dataset and repository structure.
 
-### Fixed
+No changes to `app.R`; version remains 0.1.0.
 
-#### Class Bar Plots — mismatched units label
-The **Units** dropdown on the Class Bar Plots tab was a free-text label with no connection to the underlying data — it was possible to select "nmol/mg protein" while the plotted values were actually in pmol/µg, silently mislabelling the y-axis. The dropdown has been removed; the y-axis unit is now derived automatically from the ISTD CSV's `units` column (and the protein units selector, if protein normalisation is active), the same approach already used on the Metabolite and Class-all plot tabs, so the label can no longer disagree with the data.
+---
 
-### Improved
+## [0.2.1] — 2026-07-27
 
-#### Plotly hover tooltips now show sample identity
-On the single-metabolite plot (Step 4) and the all-metabolites-in-class plot (Step 5), hovering over an individual point now shows the source sample name. The single-metabolite plot's tooltip (`Sample: … / Value: …`) replaces the previously redundant metabolite name (already fixed for the whole plot); the class-all plot's tooltip (`Sample: … / Metabolite: … / Value: …`) adds sample identity alongside the existing metabolite and value. Useful for tracing an individual jittered point back to its source injection, especially when technical replicate averaging is enabled and the point represents an averaged biological sample.
+### Added
+
+#### Idle-session timeout
+Sessions now track user activity (mouse movement, clicks, keyboard, scroll, touch) client-side. After 15 minutes of inactivity a warning modal appears asking the user to confirm they're still there; if no further activity follows, the session closes automatically at 20 minutes via `session$close()`, freeing the server process's memory held by an abandoned tab. Any tracked activity — including dismissing the warning — resets both timers. Implemented entirely within `app.R` (`idle_timeout_js` in the UI, paired `observeEvent` handlers server-side); `shiny-server.conf`'s `app_idle_timeout` is unchanged and continues to govern process-level cleanup only (killing the R process once zero sessions remain connected), which is separate from this per-session inactivity check.
 
 ---
 

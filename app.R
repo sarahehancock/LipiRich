@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.2.0
+# LipiRich v0.2.1
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.0.10
+# Version:  0.2.1
 # Tested with: MS-DIAL 5.5.251021, R 4.5.2, Bioconductor 3.22
 # --------------------------
 
-APP_VERSION <- "0.2.0"
+APP_VERSION <- "0.2.1"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -211,6 +211,45 @@ hide_loading_modal <- function() {
 # Spinner keyframes (inject once in UI head)
 enrichment_spinner_css <- tags$style(HTML("
 @keyframes spin { from {transform: rotate(0deg);} to {transform: rotate(360deg);} }
+"))
+
+# --- Idle-session timeout ---
+# Client tracks activity (mouse/keyboard/touch/scroll). After 15 min of no
+# activity, an "idle_warning" event asks the server to show a warning modal.
+# After 20 min of no activity, an "idle_timeout" event asks the server to
+# close the session outright (frees server memory held by abandoned tabs;
+# data was only ever held in-session per the app's no-persistence design).
+# Any tracked activity — including clicking the warning modal's own button —
+# resets both timers via the shared document-level listeners.
+idle_timeout_js <- tags$script(HTML("
+(function() {
+  var WARN_MS    = 15 * 60 * 1000;
+  var TIMEOUT_MS = 20 * 60 * 1000;
+  var warnTimer, timeoutTimer;
+  var warningActive = false;
+
+  function resetIdleTimers() {
+    clearTimeout(warnTimer);
+    clearTimeout(timeoutTimer);
+    if (warningActive) {
+      warningActive = false;
+      Shiny.setInputValue('idle_dismiss_warning', Math.random(), {priority: 'event'});
+    }
+    warnTimer = setTimeout(function() {
+      warningActive = true;
+      Shiny.setInputValue('idle_warning', Math.random(), {priority: 'event'});
+    }, WARN_MS);
+    timeoutTimer = setTimeout(function() {
+      Shiny.setInputValue('idle_timeout', Math.random(), {priority: 'event'});
+    }, TIMEOUT_MS);
+  }
+
+  ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(function(evt) {
+    document.addEventListener(evt, resetIdleTimers, {passive: true});
+  });
+
+  $(document).on('shiny:connected', resetIdleTimers);
+})();
 "))
 
 
@@ -680,7 +719,7 @@ landing_page_ui <- function() {
       tags$p("If you use LipiRich in your research, please cite:"),
       div(class = "cite-box",
           "Hancock, SE. (2026). LipiRich: A Shiny application for normalisation,
-statistics, and visualisation of MS-DIAL lipidomics data (v0.2.0).
+statistics, and visualisation of MS-DIAL lipidomics data (v0.2.1).
 GitHub: https://github.com/sarahehancock/LipiRich
 DOI: [pending]"
       ),
@@ -696,6 +735,7 @@ DOI: [pending]"
 ui <- fluidPage(
   landing_css,
   enrichment_spinner_css,
+  idle_timeout_js,
   titlePanel("LipiRich — Normalisation, statistics and visualisation for MS-DIAL lipidomics data"),
   sidebarLayout(
     sidebarPanel(
@@ -2130,6 +2170,35 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   
+  # ── Idle-session timeout ──────────────────────────────────────────────────
+  # Paired with idle_timeout_js in the UI. Warns at 15 min idle, closes the
+  # session at 20 min idle. Session close frees the R process's held memory
+  # for that session (uploaded data, computed results) once a tab has been
+  # abandoned; it does not affect active users.
+  observeEvent(input$idle_warning, {
+    showModal(modalDialog(
+      title = "Still there?",
+      "This session has been idle for 15 minutes. To free up server resources, ",
+      "it will close automatically after 20 minutes of inactivity. ",
+      "Click below or interact with the app to stay connected.",
+      footer = modalButton("Stay connected"),
+      easyClose = TRUE
+    ))
+  }, ignoreInit = TRUE)
+  
+  observeEvent(input$idle_dismiss_warning, {
+    removeModal()
+  }, ignoreInit = TRUE)
+  
+  observeEvent(input$idle_timeout, {
+    showModal(modalDialog(
+      title = "Session closed",
+      "This session was closed after 20 minutes of inactivity. Please refresh the page to start a new session.",
+      footer = NULL,
+      easyClose = FALSE
+    ))
+    session$close()
+  }, ignoreInit = TRUE)
   
   
   
