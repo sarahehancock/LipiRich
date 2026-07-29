@@ -22,6 +22,21 @@ No changes to `app.R`; version remains 0.1.0.
 
 ---
 
+## [0.2.2] — 2026-07-29
+
+### Added
+
+#### Outlier Detection (Step 3b) — plot export
+The Sample-level PCA Hotelling's T² and iQC replicate deviation plots now have the same standardised Width/Height/DPI/Scale/Base font size export controls with PNG/SVG buttons used throughout the rest of the app. Both plots share one set of export controls; each build was factored into its own `.build_outlier_sample_plot()` / `.build_outlier_iqc_plot()` function (parameterised by font size) so the on-screen render and both download handlers draw from a single source, matching the pattern already used for PCA and Class Bar Plots.
+
+#### Synthesis Pathways — direct plasmanyl-PC synthesis score
+Added `plasmanyl-PC synthesis, direct (PC-O XX:0/DG-O)` alongside the existing headgroup-conversion score `plasmanyl-PC synthesis (PC-O XX:0/PE-O XX:0)`. Mammalian plasmanyl-PC can be synthesised either directly from the shared DG-O ether precursor via the CDP-choline branch, or via headgroup conversion from plasmanyl-PE — the two scores now let both routes be inspected separately. Plasmenyl-PC is unaffected and remains scored only via headgroup conversion from plasmenyl-PE, since the mammalian plasmalogen desaturase (PEDS1/TMEM189) is PE-selective and there is no direct DG-O route to plasmenyl-PC.
+
+#### Synthesis Pathways — interpretation note
+Added a note under the Step 12 header flagging that these scores are based on established mammalian synthesis pathways, some of which involve enzymes with overlapping or tissue-dependent substrate preferences, and should be read as pathway-activity indicators rather than direct single-step flux measurements.
+
+---
+
 ## [0.2.1] — 2026-07-27
 
 ### Added

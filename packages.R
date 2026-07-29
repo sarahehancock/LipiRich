@@ -32,7 +32,7 @@ cran_packages <- c(
   "sass",
   "sourcetools",
   "xtable",
-
+  
   # Data wrangling (tidyverse core)
   "dplyr",
   "tidyr",
@@ -40,6 +40,7 @@ cran_packages <- c(
   "tibble",
   "purrr",
   "stringr",
+  "forcats",
   "rlang",
   "generics",
   "magrittr",
@@ -59,7 +60,7 @@ cran_packages <- c(
   "backports",
   "withr",
   "fs",
-
+  
   # Plotting
   "ggplot2",
   "plotly",
@@ -84,7 +85,7 @@ cran_packages <- c(
   "cowplot",
   "systemfonts",
   "textshaping",
-
+  
   # Statistics & multivariate
   "FactoMineR",
   "rstatix",
@@ -119,10 +120,10 @@ cran_packages <- c(
   "corrplot",
   "dendextend",
   "polynom",
-
+  
   # Network
   "visNetwork",
-
+  
   # Time series / forecasting (indirect deps)
   "forecast",
   "timeDate",
@@ -130,7 +131,7 @@ cran_packages <- c(
   "fracdiff",
   "urca",
   "tseries",
-
+  
   # Misc / infrastructure
   "R6",
   "Rcpp",

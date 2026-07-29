@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.2.1-blue" alt="v0.2.1"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.2.2-blue" alt="v0.2.2"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.5.2, and Bioconductor 3.22.
 
-> ⚠️ **Pre-publication software (v0.2.1):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.2.2):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -222,6 +222,8 @@ A combined sample-level and feature-level outlier workflow sits upstream of all 
 
 ISTD, Blank, and iQC/QC samples are excluded from the entire workflow — none of them can be flagged or excluded, since they are not biological replicates.
 
+Both plots (PCA Hotelling's T² and iQC replicate deviation) have standard Width/Height/DPI/Scale/Base font size export controls with PNG/SVG buttons, sharing one set of dimension controls.
+
 ---
 
 ## PCA
@@ -309,6 +311,10 @@ Group selection is inherited from the Statistics tab: only groups included in th
 
 The Synthesis Pathways tab provides two views of curated **enzyme activity proxy scores** — lipid class ratios and fractions designed to reflect the relative activity of key lipid synthesis enzymes (e.g. Kennedy pathway, PEMT, sphingomyelin synthase, ether lipid synthesis).
 
+For the ether lipid branch, plasmanyl-PC is scored two ways: **direct** (PC-O plasmanyl/DG-O), reflecting the CDP-choline route straight from the shared ether precursor, and **headgroup-conversion** (PC-O plasmanyl/PE-O plasmanyl), reflecting the alternative route via plasmanyl-PE. Plasmenyl-PC is only scored via headgroup conversion (PC-O plasmenyl/PE-O plasmenyl), since mammalian plasmalogen desaturation is PE-selective and there is no direct route from DG-O to plasmenyl-PC.
+
+> **Interpret with care:** these scores are built from established *mammalian* synthesis pathways. Some steps involve enzymes with overlapping or tissue-dependent substrate preferences, and a given score may reflect more than one biosynthetic route contributing to the same lipid pool. Treat them as pathway-activity indicators rather than direct measurements of flux through a single enzymatic step.
+
 ### Scores heatmap
 
 Each row is a pathway score; each column is a sample (or group mean). Values are z-scored by row to highlight relative differences across groups. Colour palette, clustering, and export dimensions are configurable.
@@ -393,7 +399,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.2.1). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.2.2). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 

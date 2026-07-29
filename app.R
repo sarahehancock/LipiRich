@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.2.1
+# LipiRich v0.2.2
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.2.1
+# Version:  0.2.2
 # Tested with: MS-DIAL 5.5.251021, R 4.5.2, Bioconductor 3.22
 # --------------------------
 
-APP_VERSION <- "0.2.1"
+APP_VERSION <- "0.2.2"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -719,7 +719,7 @@ landing_page_ui <- function() {
       tags$p("If you use LipiRich in your research, please cite:"),
       div(class = "cite-box",
           "Hancock, SE. (2026). LipiRich: A Shiny application for normalisation,
-statistics, and visualisation of MS-DIAL lipidomics data (v0.2.1).
+statistics, and visualisation of MS-DIAL lipidomics data (v0.2.2).
 GitHub: https://github.com/sarahehancock/LipiRich
 DOI: [pending]"
       ),
@@ -1187,7 +1187,25 @@ ui <- fluidPage(
                          "Excluded points/samples are removed from the shared dataset used by every",
                          " other tab, not deleted from your file \u2014 turn a toggle back off, or use the",
                          " manual review tables, to restore them at any time."
-                       ))
+                       )),
+                       tags$hr(),
+                       h5("Export plots"),
+                       numericInput("outlier_export_width",    "Width (px)",      1200, 400, 4000, 50),
+                       numericInput("outlier_export_height",   "Height (px)",      500, 300, 4000, 50),
+                       numericInput("outlier_export_dpi",      "DPI",              300,  72,  600, 12),
+                       numericInput("outlier_export_scale",    "Scale fraction",  1.00, 0.25, 2.00, 0.05),
+                       numericInput("outlier_export_fontsize", "Base font size",    13,    6,   24,  1),
+                       helpText(tags$small("Sample-level: PCA Hotelling's T\u00b2")),
+                       fluidRow(
+                         column(6, downloadButton("download_outlier_sample_png", "PNG", class = "btn-primary btn-sm")),
+                         column(6, downloadButton("download_outlier_sample_svg", "SVG", class = "btn-sm"))
+                       ),
+                       br(),
+                       helpText(tags$small("Sample-level: iQC replicate deviation")),
+                       fluidRow(
+                         column(6, downloadButton("download_outlier_iqc_png", "PNG", class = "btn-primary btn-sm")),
+                         column(6, downloadButton("download_outlier_iqc_svg", "SVG", class = "btn-sm"))
+                       )
                      )
                    ),
                    column(
@@ -2083,6 +2101,16 @@ ui <- fluidPage(
         ),
         tabPanel("Synthesis Pathways",
                  h4("Step 12: Lipid class synthesis pathway scores & statistics"),
+                 helpText(tags$small(
+                   tags$strong("Note:"), " these scores are ratios/fractions built from established ",
+                   tags$em("mammalian"), " lipid synthesis pathways (e.g. the Kennedy pathway, ether",
+                   " lipid biosynthesis, PEMT-mediated PE\u2192PC conversion). Some steps involve enzymes",
+                   " with overlapping or tissue-dependent substrate preferences, and a given score may",
+                   " reflect more than one biosynthetic route contributing to the same lipid pool.",
+                   " Treat them as pathway-activity indicators rather than direct measurements of flux",
+                   " through a single enzymatic step, and interpret changes with reference to the",
+                   " underlying biology of your tissue/model system."
+                 )),
                  fluidRow(
                    column(
                      width = 3,
@@ -3020,7 +3048,7 @@ server <- function(input, output, session) {
   })
   
   # ---- Outlier Detection tab outputs ----
-  output$outlierSamplePlot <- renderPlot({
+  .build_outlier_sample_plot <- function(fsz = 13) {
     df <- sample_outlier_flags()
     validate(need(nrow(df) > 0,
                   "Not enough samples/features for PCA-based outlier detection (need \u2265 5 non-blank samples and \u2265 2 informative features)."))
@@ -3034,11 +3062,11 @@ server <- function(input, output, session) {
       ggplot2::scale_fill_manual(values = c(`FALSE` = "#4c72b0", `TRUE` = "#c44e52"),
                                  labels = c("Normal", "Flagged"), name = NULL) +
       ggplot2::labs(x = NULL, y = "Hotelling's T\u00b2") +
-      ggplot2::theme_minimal(base_size = 13) +
+      ggplot2::theme_minimal(base_size = fsz) +
       ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
-  })
+  }
   
-  output$outlierIqcPlot <- renderPlot({
+  .build_outlier_iqc_plot <- function(fsz = 13) {
     df <- iqc_outlier_flags()
     validate(need(nrow(df) > 0, "Fewer than 3 iQC samples detected \u2014 iQC deviation check skipped."))
     df <- df %>%
@@ -3051,9 +3079,80 @@ server <- function(input, output, session) {
       ggplot2::scale_fill_manual(values = c(`FALSE` = "#4c72b0", `TRUE` = "#c44e52"),
                                  labels = c("Normal", "Flagged"), name = NULL) +
       ggplot2::labs(x = NULL, y = "Median relative deviation") +
-      ggplot2::theme_minimal(base_size = 13) +
+      ggplot2::theme_minimal(base_size = fsz) +
       ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+  }
+  
+  output$outlierSamplePlot <- renderPlot({
+    .build_outlier_sample_plot(input$outlier_export_fontsize %||% 13)
   })
+  
+  output$outlierIqcPlot <- renderPlot({
+    .build_outlier_iqc_plot(input$outlier_export_fontsize %||% 13)
+  })
+  
+  # Export helpers
+  .outlier_export_dims <- function() {
+    px_w  <- input$outlier_export_width  %||% 1200
+    px_h  <- input$outlier_export_height %||% 500
+    dpi   <- input$outlier_export_dpi    %||% 300
+    scale <- input$outlier_export_scale  %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+  
+  output$download_outlier_sample_png <- downloadHandler(
+    filename = function() paste0("outlier_sample_hotelling_", Sys.Date(), ".png"),
+    content = function(file) {
+      dims <- isolate(.outlier_export_dims())
+      fsz  <- isolate(input$outlier_export_fontsize %||% 13)
+      p    <- isolate(.build_outlier_sample_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      ggplot2::ggsave(file, plot = p,
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
+    }
+  )
+  
+  output$download_outlier_sample_svg <- downloadHandler(
+    filename = function() paste0("outlier_sample_hotelling_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.outlier_export_dims())
+      fsz  <- isolate(input$outlier_export_fontsize %||% 13)
+      p    <- isolate(.build_outlier_sample_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
+    }
+  )
+  
+  output$download_outlier_iqc_png <- downloadHandler(
+    filename = function() paste0("outlier_iqc_deviation_", Sys.Date(), ".png"),
+    content = function(file) {
+      dims <- isolate(.outlier_export_dims())
+      fsz  <- isolate(input$outlier_export_fontsize %||% 13)
+      p    <- isolate(.build_outlier_iqc_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      ggplot2::ggsave(file, plot = p,
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
+    }
+  )
+  
+  output$download_outlier_iqc_svg <- downloadHandler(
+    filename = function() paste0("outlier_iqc_deviation_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.outlier_export_dims())
+      fsz  <- isolate(input$outlier_export_fontsize %||% 13)
+      p    <- isolate(.build_outlier_iqc_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
+    }
+  )
   
   output$outlier_feature_summary <- renderText({
     df <- feature_outlier_flags()
@@ -7418,6 +7517,11 @@ server <- function(input, output, session) {
         type = "ratio",
         num  = c("PC-O plasmanyl"),
         den  = c("PE-O plasmanyl")
+      ),
+      "plasmanyl-PC synthesis, direct (PC-O XX:0/DG-O)" = list(
+        type = "ratio",
+        num  = c("PC-O plasmanyl"),
+        den  = c("DG-O")
       ),
       "plasmenyl-PE synthesis (PE-O XX:>=1/PE-O XX:0)" = list(
         type = "ratio",
