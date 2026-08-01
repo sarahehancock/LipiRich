@@ -32,7 +32,7 @@
 
 ## Getting Started
 
-> **New here?** The [step-by-step tutorial](TUTORIAL.md) walks through every tab using the bundled demo dataset.
+> **New here?** The [step-by-step tutorial]([TUTORIAL.md](https://github.com/sarahehancock/LipiRich/blob/main/demo_data/MSDIAL_processing_tutorial.md)) walks through every tab using the bundled demo dataset.
 
 ### Option 1 — Use the live web app
 
