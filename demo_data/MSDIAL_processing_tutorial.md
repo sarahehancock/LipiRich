@@ -86,7 +86,7 @@ Click "Remove all", then select the following lipid classes:
 | Hex2Cer [M+H]+ |  |
 | ST [M+H-H2O]+ |  |
 
-Internal standard [IS] libraries must also be added. Click the plus symbol again, this time choosing "msp" under database type. Browse to `Lipid_ISTD_pos.msp` (available in the Zenodo repository) and click **Open**. Under "Annotation method" change "Retention time tolerance" to 1 min.
+Internal standard [IS] libraries must also be added. Click the plus symbol again, this time choosing "msp" under database type. Browse to `Lipid_ISTD_pos.msp` (download from github) and click **Open**. Under "Annotation method" change "Retention time tolerance" to 1 min.
 
 Under "Annotation cut off" change "Dot product score" and "Weighted dot product score" to 150, and "Reverse dot product score" to 300. Change "Minimum number of matched spectrum" to 1. Under "Retention time setting" check "Use retention time for scoring". Finally, under "Annotation method setting" click on the Lipid_ISTD_pos library and use the up arrow to move it to the top.
 
