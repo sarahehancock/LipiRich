@@ -1,6 +1,6 @@
 # packages.R
 # Install all dependencies for LipiDash Shiny app
-# R 4.5.2 | Bioconductor 3.22
+# R 4.6.1 | Bioconductor 3.23
 # Run during Docker image build; do NOT source at runtime.
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -209,7 +209,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) {
   install.packages("BiocManager", repos = "https://cran.rstudio.com")
 }
 
-BiocManager::install(version = "3.22", ask = FALSE, update = FALSE)
+BiocManager::install(version = "3.23", ask = FALSE, update = FALSE)
 
 bioc_packages <- c(
   "BiocParallel",   # parallel backend used by fgsea

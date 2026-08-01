@@ -6,7 +6,20 @@
 
 ## [Unreleased]
 
+---
+
+## [0.3.0] — 2026-08-01
+
 ### Added
+
+#### Cross-mode identity reconciliation
+For the glycerophospholipid classes (PC, PE, PG, PI, PS, PA) and cardiolipin (CL), LipiRich can now pair each species across ion modes by sum composition and retention time, taking quantitation from the adduct-matched positive-mode feature and the acyl-resolved identity from the negative-mode feature. A species is quantified once rather than double-counted across modes. Unmatched features are never dropped: a positive-only feature is shown at the depth positive mode can determine (sum composition, or the two combined halves for CL), a negative-only feature keeps its full acyl identity, and each is quantified from its own-mode internal standard. The behaviour, the reconciled class list, and the retention-time tolerance are configurable in the **Settings** tab (enabled by default); turning it off reverts those classes to prefer-negative handling. Internal standards are never reconciled.
+
+#### Cross-mode audit tab
+A new **Cross-mode audit** tab lists every reconciliation decision — positive features re-identified from negative mode, positive features retained at sum composition (or positive substructure for CL), and negative-only features retained and negative-quantified — with the shorthand, matched retention times and ΔRT, the final identity carried downstream, and the ion mode each abundance is quantified from. Fully traceable and reloads with the data.
+
+#### Plot single lipid — ion-mode selector and cascading filters
+The Plot single lipid tab gains an **Ion mode** control (All / Positive / Negative). The ion-mode, adduct, and metabolite-name selectors now cascade: the adduct list reflects the chosen class and mode, and the name list only offers species that have data under the current mode and adduct. A selection can therefore no longer produce an empty plot.
 
 #### Demo dataset
 Added a full demonstration dataset to `demo_data/`, generated from mouse liver samples (n = 8 per group: chow, lard-based high-fat diet, 90% fish oil high-fat diet):
@@ -18,7 +31,25 @@ Added a full demonstration dataset to `demo_data/`, generated from mouse liver s
 
 The original LC-MS `.raw` files are archived separately on Zenodo (DOI: 10.5281/zenodo.21448733) due to size. README updated with a full description of the demo dataset and repository structure.
 
-No changes to `app.R`; version remains 0.1.0.
+### Changed
+
+#### IS Plots default to both ion modes, with standard names on hover
+The Internal Standards plot now defaults to showing positive and negative standards side by side (**Both (separate)**) rather than a single mode, and each point's hover leads with the exact internal-standard name — useful for identifying which standard is responsible for an anomalous point, particularly in the pooled **Unknown** class.
+
+#### Landing page
+The front page has been redesigned (modern card layout and typography) and its documentation updated to describe cross-mode reconciliation, the audit tab, the single-lipid cascade, and the IS-plot changes.
+
+#### Environment
+Now developed and tested with **R 4.6.1** and **Bioconductor 3.23** (previously R 4.5.2 / Bioconductor 3.22). `packages.R` and the Dockerfile base image updated accordingly.
+
+### Fixed
+
+- **Cross-mode retention-time matching** no longer errors when `Average Rt(min)` is imported as a character column; it is coerced to numeric for the RT arithmetic while the source column type is left unchanged.
+- **`case_when()` deprecation (dplyr 1.2.0):** the Class Bar Plots point fill and outline, which selected a vector palette from a scalar mode setting, were rewritten as `if`/`else` to avoid the deprecated scalar-LHS / vector-RHS pattern.
+- **`.data[[ ]]` in tidyselect deprecation (tidyselect 1.2.0):** the Correlation Network `select()` and `pivot_wider()` now use `all_of()` instead of the `.data` pronoun in tidyselect position.
+- **plotly `layout(height=)` deprecation:** the single-lipid plot height is now passed to `ggplotly()` directly.
+- **Unknown-column warning:** `norm_units` is guarded in the single-lipid plotting path so a filtered slice or non-normalised value type no longer triggers an "unknown or uninitialised column" warning.
+- **Correlation Network:** zero-variance (constant) features are dropped before `cor()`, avoiding a "standard deviation is zero" warning and spurious `NA` columns.
 
 ---
 

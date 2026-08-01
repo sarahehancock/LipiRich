@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.2.2
+# LipiRich v0.3.0
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.2.2
-# Tested with: MS-DIAL 5.5.251021, R 4.5.2, Bioconductor 3.22
+# Version:  0.3.0
+# Tested with: MS-DIAL 5.5.251021, R 4.6.1, Bioconductor 3.23
 # --------------------------
 
-APP_VERSION <- "0.2.2"
+APP_VERSION <- "0.3.0"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -343,390 +343,185 @@ build_token_choices <- function(sample_names, delimiter = "_") {
 
 # ── Landing page CSS ──────────────────────────────────────────────────────────
 landing_css <- tags$style(HTML("
-  .lipid-landing {
-    font-family: 'Georgia', serif;
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 10px 24px 40px 24px;
-    color: #2c2c2c;
+  .lipid-landing{
+    --lr-ink:#131b20; --lr-muted:#5c6b72; --lr-surface:#ffffff;
+    --lr-line:#e4eaeb; --lr-primary:#0b6b66; --lr-primary-ink:#08514d;
+    --lr-primary-soft:#e9f3f2; --lr-amber-soft:#fbf3e1;
+    --lr-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+    --lr-mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+    --lr-r:14px; --lr-r-sm:10px;
+    --lr-shadow:0 1px 2px rgba(16,24,32,.05),0 12px 30px -18px rgba(16,24,32,.22);
+    font-family:var(--lr-sans); font-size:16px; color:var(--lr-ink);
+    max-width:1000px; margin:0 auto; padding:8px 24px 56px;
+    -webkit-font-smoothing:antialiased;
   }
-  .lipid-landing h1.brand {
-    font-size: 2.4em;
-    font-weight: bold;
-    color: #1a3a5c;
-    margin-bottom: 0;
-    letter-spacing: -0.5px;
-  }
-  .lipid-landing .version-badge {
-    display: inline-block;
-    background: #1a3a5c;
-    color: #fff;
-    font-size: 0.75em;
-    font-family: monospace;
-    padding: 2px 10px;
-    border-radius: 12px;
-    margin-left: 10px;
-    vertical-align: middle;
-    letter-spacing: 0.5px;
-  }
-  .lipid-landing .tagline {
-    color: #4a6fa5;
-    font-size: 1.1em;
-    font-style: italic;
-    margin-top: 4px;
-    margin-bottom: 20px;
-  }
-  .lipid-landing hr.brand-rule {
-    border: none;
-    border-top: 3px solid #1a3a5c;
-    margin: 0 0 24px 0;
-  }
-  .lipid-landing h2 {
-    font-size: 1.25em;
-    color: #1a3a5c;
-    border-left: 4px solid #4a6fa5;
-    padding-left: 10px;
-    margin-top: 28px;
-    margin-bottom: 10px;
-  }
-  .lipid-landing p, .lipid-landing li {
-    font-size: 0.97em;
-    line-height: 1.7;
-    color: #333;
-  }
-  .lipid-landing ul {
-    padding-left: 1.4em;
-  }
-  .lipid-landing .workflow-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 12px;
-    margin-top: 12px;
-  }
-  .lipid-landing .workflow-card {
-    background: #f0f4fa;
-    border-radius: 8px;
-    padding: 14px 16px;
-    border-left: 4px solid #4a6fa5;
-  }
-  .lipid-landing .workflow-card .step-num {
-    font-size: 0.75em;
-    font-family: monospace;
-    color: #4a6fa5;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  .lipid-landing .workflow-card .step-title {
-    font-size: 0.95em;
-    font-weight: bold;
-    color: #1a3a5c;
-    margin: 4px 0 2px 0;
-  }
-  .lipid-landing .workflow-card .step-desc {
-    font-size: 0.85em;
-    color: #555;
-    line-height: 1.5;
-  }
-  .lipid-landing .info-box {
-    background: #eaf1fb;
-    border: 1px solid #b8d0ed;
-    border-radius: 6px;
-    padding: 14px 18px;
-    margin-top: 14px;
-    font-size: 0.92em;
-  }
-  .lipid-landing .info-box strong {
-    color: #1a3a5c;
-  }
-  .lipid-landing .pub-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    margin-top: 12px;
-  }
-  .lipid-landing .pub-card {
-    background: #f7f7f7;
-    border: 1px dashed #bbb;
-    border-radius: 6px;
-    padding: 14px 16px;
-  }
-  .lipid-landing .pub-card .pub-label {
-    font-size: 0.75em;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #888;
-    font-family: monospace;
-  }
-  .lipid-landing .pub-card .pub-value {
-    font-size: 0.95em;
-    color: #aaa;
-    font-style: italic;
-    margin-top: 4px;
-  }
-  .lipid-landing .cite-box {
-    background: #f4f4f4;
-    border-left: 4px solid #ccc;
-    border-radius: 4px;
-    padding: 12px 16px;
-    font-family: monospace;
-    font-size: 0.85em;
-    color: #555;
-    margin-top: 10px;
-    white-space: pre-wrap;
-  }
-  .lipid-landing .footer-note {
-    margin-top: 36px;
-    padding-top: 14px;
-    border-top: 1px solid #ddd;
-    font-size: 0.82em;
-    color: #888;
-    text-align: center;
-  }
-  @media (max-width: 600px) {
-    .lipid-landing .pub-grid { grid-template-columns: 1fr; }
-    .lipid-landing .workflow-grid { grid-template-columns: 1fr; }
-  }
+  .lipid-landing *{ box-sizing:border-box; }
+  .lipid-landing .lr-eyebrow{ font-family:var(--lr-mono); font-size:.78em; letter-spacing:.14em; text-transform:uppercase; color:var(--lr-primary); font-weight:600; }
+  .lipid-landing h1.lr-brand{ font-size:2.7em; font-weight:800; letter-spacing:-.02em; color:var(--lr-ink); margin:.15em 0 0; line-height:1.04; }
+  .lipid-landing .lr-ver{ font-family:var(--lr-mono); font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--lr-primary-ink); background:var(--lr-primary-soft); border:1px solid #cfe6e3; padding:3px 9px; border-radius:999px; vertical-align:middle; margin-left:12px; }
+  .lipid-landing .lr-tagline{ color:var(--lr-muted); font-size:1.32em; margin:.55em 0 0; max-width:62ch; }
+  .lipid-landing .lr-badges{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
+  .lipid-landing .lr-badges img{ height:20px; }
+  .lipid-landing .lr-section{ margin-top:36px; }
+  .lipid-landing .lr-section > h2{ font-size:1.52em; font-weight:700; color:var(--lr-ink); margin:.3em 0 .2em; letter-spacing:-.01em; }
+  .lipid-landing p, .lipid-landing li{ font-size:1.18em; line-height:1.7; color:#2c3a40; }
+  .lipid-landing a{ color:var(--lr-primary-ink); text-decoration:none; border-bottom:1px solid #bfe0dc; }
+  .lipid-landing a:hover{ border-bottom-color:var(--lr-primary); }
+  .lipid-landing .lr-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin-top:16px; }
+  .lipid-landing .lr-card{ background:var(--lr-surface); border:1px solid var(--lr-line); border-radius:var(--lr-r); padding:16px 18px; transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+  .lipid-landing .lr-card:hover{ transform:translateY(-2px); box-shadow:var(--lr-shadow); border-color:#cfe0df; }
+  .lipid-landing .lr-step{ font-family:var(--lr-mono); font-size:.74em; font-weight:600; letter-spacing:.08em; color:var(--lr-primary); text-transform:uppercase; }
+  .lipid-landing .lr-card h3{ font-size:1.16em; font-weight:700; color:var(--lr-ink); margin:6px 0 4px; }
+  .lipid-landing .lr-card p{ font-size:1.08em; line-height:1.55; color:#41505a; margin:0; }
+  .lipid-landing .lr-feature{ background:linear-gradient(160deg,#0b6b66,#073f3c); color:#eaf6f5; border-radius:var(--lr-r); padding:22px 24px; margin-top:18px; box-shadow:var(--lr-shadow); }
+  .lipid-landing .lr-feature .lr-eyebrow{ color:#8fd8d2; }
+  .lipid-landing .lr-feature h3{ color:#fff; font-size:1.34em; font-weight:700; margin:6px 0 8px; letter-spacing:-.01em; }
+  .lipid-landing .lr-feature p{ color:#d6ecea; font-size:1.12em; line-height:1.65; margin:0 0 8px; }
+  .lipid-landing .lr-feature strong{ color:#fff; }
+  .lipid-landing .lr-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .lipid-landing .lr-chip{ font-family:var(--lr-mono); font-size:.78em; background:rgba(255,255,255,.12); color:#eafffb; border:1px solid rgba(255,255,255,.22); padding:4px 10px; border-radius:999px; }
+  .lipid-landing .lr-note{ background:var(--lr-primary-soft); border:1px solid #d3e7e5; border-radius:var(--lr-r-sm); padding:14px 18px; margin-top:16px; font-size:1.1em; color:#274b48; }
+  .lipid-landing .lr-note strong{ color:var(--lr-primary-ink); }
+  .lipid-landing .lr-notice{ background:var(--lr-amber-soft); border:1px solid #f0d79a; border-radius:var(--lr-r-sm); padding:12px 18px; margin:18px 0; font-size:1.06em; color:#6b4e12; }
+  .lipid-landing .lr-notice strong{ color:#8a5a00; }
+  .lipid-landing ol{ padding-left:1.3em; }
+  .lipid-landing .lr-links{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+  .lipid-landing .lr-linkcard{ background:var(--lr-surface); border:1px solid var(--lr-line); border-radius:var(--lr-r-sm); padding:14px 16px; }
+  .lipid-landing .lr-linkcard .lr-k{ font-family:var(--lr-mono); font-size:.72em; text-transform:uppercase; letter-spacing:.1em; color:var(--lr-muted); }
+  .lipid-landing .lr-linkcard .lr-v{ font-size:1.14em; margin-top:4px; word-break:break-word; }
+  .lipid-landing .lr-linkcard .lr-v.pending{ color:#9aa7ac; font-style:italic; }
+  .lipid-landing .lr-cite{ background:#0f171b; color:#c9d6da; border-radius:var(--lr-r-sm); padding:14px 16px; font-family:var(--lr-mono); font-size:.96em; line-height:1.6; white-space:pre-wrap; margin-top:12px; border:1px solid #1d2a30; }
+  .lipid-landing .lr-footer{ margin-top:40px; padding-top:16px; border-top:1px solid var(--lr-line); font-size:.85em; color:#93a1a6; text-align:center; font-family:var(--lr-mono); letter-spacing:.02em; }
+  @media (max-width:620px){ .lipid-landing .lr-links{ grid-template-columns:1fr; } .lipid-landing h1.lr-brand{ font-size:2.1em; } }
+  @media (prefers-reduced-motion:reduce){ .lipid-landing .lr-card{ transition:none; } }
 "))
 
 # ── Landing page UI ───────────────────────────────────────────────────────────
 landing_page_ui <- function() {
   div(class = "lipid-landing",
-      
-      # ── Header ──
-      tags$h1(class = "brand",
-              "LipiRich",
-              tags$span(class = "version-badge", paste0("v", APP_VERSION))
-      ),
-      tags$p(class = "tagline",
-             "Normalisation, statistics, and visualisation for MS-DIAL lipidomics data"
-      ),
-      # ── Version / status badges ──
-      div(style = "display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; align-items:center;",
-          tags$a(
-            href = paste0("https://github.com/sarahehancock/LipiRich/releases/tag/v", APP_VERSION),
-            target = "_blank",
-            tags$img(
-              src = paste0("https://img.shields.io/badge/version-", APP_VERSION, "-blue"),
-              alt = paste0("v", APP_VERSION),
-              style = "height:20px;"
-            )
-          ),
-          tags$a(
-            href = "https://github.com/sarahehancock/LipiRich",
-            target = "_blank",
-            tags$img(
-              src = "https://img.shields.io/badge/GitHub-sarahehancock%2FLipiRich-181717?logo=github",
-              alt = "GitHub",
-              style = "height:20px;"
-            )
-          ),
-          tags$img(
-            src = "https://img.shields.io/badge/license-AGPL--3.0-blue",
-            alt = "AGPL-3.0 License",
-            style = "height:20px;"
-          ),
-          tags$img(
-            src = "https://img.shields.io/badge/R-%3E%3D4.5.2-informational",
-            alt = "R >= 4.5.2",
-            style = "height:20px;"
+
+      # ── Hero ──
+      div(class = "lr-hero",
+          div(class = "lr-eyebrow", "MS-DIAL 5 \u00b7 untargeted lipidomics"),
+          tags$h1(class = "lr-brand", "LipiRich",
+                  tags$span(class = "lr-ver", paste0("v", APP_VERSION))),
+          tags$p(class = "lr-tagline",
+                 "Normalisation, statistics, and visualisation for MS-DIAL lipidomics data \u2014 in the browser, no code required."),
+          div(class = "lr-badges",
+              tags$a(href = paste0("https://github.com/sarahehancock/LipiRich/releases/tag/v", APP_VERSION), target = "_blank",
+                     tags$img(src = paste0("https://img.shields.io/badge/version-", APP_VERSION, "-0b6b66"), alt = paste0("v", APP_VERSION), style = "height:20px;")),
+              tags$a(href = "https://github.com/sarahehancock/LipiRich", target = "_blank",
+                     tags$img(src = "https://img.shields.io/badge/GitHub-sarahehancock%2FLipiRich-181717?logo=github", alt = "GitHub", style = "height:20px;")),
+              tags$img(src = "https://img.shields.io/badge/license-AGPL--3.0-0b6b66", alt = "AGPL-3.0 License", style = "height:20px;"),
+              tags$img(src = "https://img.shields.io/badge/R-%3E%3D4.5.2-informational", alt = "R >= 4.5.2", style = "height:20px;")
           )
       ),
+
       # ── Pre-publication notice ──
-      div(
-        style = paste0(
-          "background:#fff8e1; border:1px solid #ffe082; border-left:4px solid #f9a825;",
-          "border-radius:6px; padding:10px 16px; margin-bottom:18px; font-size:0.9em;"
-        ),
-        tags$strong("\u26a0\ufe0f Pre-publication software (v", APP_VERSION, ")"),
-        tags$br(),
-        "LipiRich is currently under active development. ",
-        "Features and outputs may change between versions. ",
-        "A citable preprint and demonstration dataset will be made available upon first stable release. ",
-        "Please check the ",
-        tags$a(href = "https://github.com/sarahehancock/LipiRich", target = "_blank", "GitHub repository"),
-        " for the latest updates and to report issues."
+      div(class = "lr-notice",
+          tags$strong("\u26a0\ufe0f Pre-publication software (v", APP_VERSION, ")"), tags$br(),
+          "LipiRich is under active development; features and outputs may change between versions. ",
+          "A citable preprint and demonstration dataset will accompany the first stable release. See the ",
+          tags$a(href = "https://github.com/sarahehancock/LipiRich", target = "_blank", "GitHub repository"),
+          " for updates and to report issues."
       ),
-      tags$hr(class = "brand-rule"),
-      
+
       # ── Overview ──
-      tags$h2("Overview"),
-      tags$p(
-        "LipiRich is an open-source, browser-based Shiny application designed to streamline
-      post-processing of untargeted lipidomics data exported from MS-DIAL. It provides a
-      complete analytical workflow — from raw alignment output through internal standard
-      normalisation, statistical testing, and lipid set enrichment — without requiring
-      programming knowledge."
+      div(class = "lr-section",
+          div(class = "lr-eyebrow", "Overview"),
+          tags$h2("What LipiRich does"),
+          tags$p("LipiRich streamlines post-processing of untargeted lipidomics data exported from MS-DIAL: from raw alignment output through internal-standard normalisation, statistical testing, and lipid set enrichment \u2014 without requiring programming knowledge."),
+          tags$p("It reads aligned .txt files exported directly from MS-DIAL 5 and supports positive and negative ion mode, including combined pos/neg experiments. Developed and tested with MS-DIAL 5.5.251021.")
       ),
-      tags$p(
-        "LipiRich accepts aligned output files (.txt) exported directly from MS-DIAL 5 and
-      supports both positive and negative ion mode data, including combined pos/neg experiments.
-      It was developed and tested using MS-DIAL version 5.5.251021."
-      ),
-      
-      # ── Workflow tabs ──
-      tags$h2("Analytical Workflow"),
-      div(class = "workflow-grid",
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 1"),
-              div(class = "step-title", "Data Import & Cleaning"),
-              div(class = "step-desc", "Upload 1–2 MS-DIAL .txt alignment files. Data are reshaped, ion modes resolved, and duplicate features deduplicated.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 2"),
-              div(class = "step-title", "Internal Standards"),
-              div(class = "step-desc", "View and QC internal standard [IS] signal by class and ion mode. Supports per-ISTD amount and units via CSV upload.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 3"),
-              div(class = "step-title", "Normalisation"),
-              div(class = "step-desc", "Background subtraction using blank samples, followed by IS-based quantitative normalisation, with optional unit-aware protein normalisation.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 4–5"),
-              div(class = "step-title", "Visualisation"),
-              div(class = "step-desc", "Interactive bar plots for individual metabolites and all species within a lipid class, with flexible grouping options.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 6"),
-              div(class = "step-title", "Export"),
-              div(class = "step-desc", "Download wide or long-format CSV files, filtered by class and value type (absolute or % of class total).")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 7"),
-              div(class = "step-title", "PCA"),
-              div(class = "step-desc", "Principal component analysis with group colouring, iQC sample overlay, and loadings table.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 8"),
-              div(class = "step-title", "Statistics"),
-              div(class = "step-desc", "Unpaired t-test, one-way ANOVA, and two-way ANOVA with multiple testing correction, post-hoc tests, per-class significance summary, and downloadable results.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 8a"),
-              div(class = "step-title", "Volcano Plot"),
-              div(class = "step-desc", "Interactive volcano plot of all tested features, coloured by direction of change. Significant feature labels repelled automatically.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 9"),
-              div(class = "step-title", "Class Bar Plots"),
-              div(class = "step-desc", "Faceted bar plots of all species within a selected lipid class, with abundance range filtering, significance highlighting, and group comparison overlays.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 9b"),
-              div(class = "step-title", "Heatmap"),
-              div(class = "step-desc", "Z-scored heatmap of significant features with configurable clustering, colour palettes, and row/column label toggles.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 10"),
-              div(class = "step-title", "Enrichment"),
-              div(class = "step-desc", "Lipid set enrichment using ORA (Fisher hypergeometric) or FGSEA, across class, fatty acid identity, saturation, chain length, and ether subclass sets.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 11"),
-              div(class = "step-title", "Correlation Network"),
-              div(class = "step-desc", "Pearson correlation network of significant lipid species within a selected group. Node colour reflects direction of change; edge width reflects correlation strength.")
-          ),
-          div(class = "workflow-card",
-              div(class = "step-num", "Step 12"),
-              div(class = "step-title", "Synthesis Pathways"),
-              div(class = "step-desc", "Curated enzyme activity proxy scores (lipid class ratios) displayed as a z-scored heatmap, with group comparison statistics (t-test or one-way ANOVA per score) to identify significantly shifted pathway activities.")
+
+      # ── Cross-mode feature highlight ──
+      div(class = "lr-feature",
+          div(class = "lr-eyebrow", "Dual-polarity reconciliation"),
+          tags$h3("Structural identity from negative mode, quantitation from positive"),
+          tags$p(HTML("For glycerophospholipids and cardiolipin, LipiRich pairs each species across polarities by sum-composition and retention time, then takes the acyl-resolved identity from the negative-mode feature and the abundance from the adduct-matched positive-mode feature \u2014 the way structural lipidomics workflows resolve fatty-acyl detail. A species is quantified once, not double-counted across modes.")),
+          tags$p(HTML("Unmatched species are never dropped: a positive-only feature is shown at the depth positive can determine (sum composition, or the two combined halves for CL), a negative-only feature keeps its full acyl identity, and each is quantified from its own-mode standard. Every decision is listed in the <strong>Cross-mode audit</strong> tab, and the whole behaviour is a toggle in <strong>Settings</strong>.")),
+          div(class = "lr-chips",
+              tags$span(class = "lr-chip", "PC"), tags$span(class = "lr-chip", "PE"),
+              tags$span(class = "lr-chip", "PG"), tags$span(class = "lr-chip", "PI"),
+              tags$span(class = "lr-chip", "PS"), tags$span(class = "lr-chip", "PA"),
+              tags$span(class = "lr-chip", "CL")
           )
       ),
-      
-      # ── Data preparation ──
-      tags$h2("Preparing Your Data in MS-DIAL"),
-      tags$p("LipiRich accepts the aligned output exported from MS-DIAL 5 as a tab-delimited .txt file. Follow these steps in MS-DIAL before uploading:"),
-      tags$ol(
-        tags$li(tags$strong("Run alignment"), " — complete peak picking and alignment for your project in MS-DIAL 5 as normal. ",
-                "It is recommended that you review your alignment result and tag correctly identified lipid species with the ",
-                tags$strong("✓ checkmark"), " in MS-DIAL, then select ", tags$strong("Filter by current parameter"), " during alignment export to include only checked features. ",
-                "This is the recommended way to control which species are passed to LipiRich for analysis."
-        ),
-        tags$li(tags$strong("Export aligned data"), " — go to ", tags$em("Export → Alignment result"), " and select the ", tags$strong(".txt"), " format. LipiRich reads from row 5 onward (skipping the first 4 MS-DIAL header rows automatically)."),
-        tags$li(tags$strong("Sample naming"), " — sample column names should end in ", tags$code("_pos"), " or ", tags$code("_neg"),
-                " to indicate ion mode (e.g. ", tags$code("Sample1_pos"), ", ", tags$code("Sample1_neg"), "). LipiRich uses these suffixes to resolve ion mode and deduplicate sample names."),
-        tags$li(tags$strong("Internal standards"), " — internal standard features must contain ", tags$code("[IS]"), " in their metabolite name as assigned by MS-DIAL. These are automatically detected and used for normalisation."),
-        tags$li(tags$strong("Positive and negative mode"), " — if you acquired data in both modes, export each as a separate .txt file and upload both simultaneously (max 2 files). LipiRich will merge them automatically."),
-        tags$li(tags$strong("Blank samples"), " — include at least one sample named ", tags$code("Blank"), " (case-insensitive) in your run. LipiRich uses blank signal for background subtraction.")
-      ),
-      
-      div(class = "info-box",
-          tags$strong("Grouping options: "), "Samples can be grouped for plotting and statistics using three methods: ",
-          tags$strong("by sample name"), " (each sample is its own group), ",
-          tags$strong("delimiter-based"), " (e.g. the first token before an underscore: Sample1_rep1 → Sample1), or ",
-          tags$strong("regex capture group"), ". Alternatively, upload a ",
-          tags$strong("grouping CSV"), " with columns ", tags$code("sample"), " and ", tags$code("group"),
-          " (and optional ", tags$code("factorA"), "/", tags$code("factorB"), " for two-way designs) to assign groups explicitly."
-      ),
-      
-      div(class = "info-box",
-          tags$strong("Technical replicates: "), "If your run includes multiple technical injections per",
-          " biological sample, LipiRich can average them together before PCA, statistics, and every downstream",
-          " plot. Identify the parent biological sample via a ", tags$code("bio_sample"), " column in the grouping",
-          " CSV, or by selecting sample-name token(s) in the Group Preview tab — including datasets where bio and",
-          " tech replicate indices are combined in one token (e.g. ", tags$code("1-1"), " for bio 1, tech 1)."
-      ),
-      
-      # ── Access options ──
-      tags$h2("Access LipiRich"),
-      div(class = "pub-grid",
-          div(class = "pub-card",
-              div(class = "pub-label", "Live Web App"),
-              div(class = "pub-value",
-                  tags$a(href = "https://lipirich.sarahehancock.com",
-                         target = "_blank",
-                         "lipirich.sarahehancock.com")
-              )
-          ),
-          div(class = "pub-card",
-              div(class = "pub-label", "GitHub Repository"),
-              div(class = "pub-value",
-                  tags$a(href = "https://github.com/sarahehancock/LipiRich",
-                         target = "_blank",
-                         "github.com/sarahehancock/LipiRich")
-              )
+
+      # ── Workflow ──
+      div(class = "lr-section",
+          div(class = "lr-eyebrow", "Analytical workflow"),
+          tags$h2("From alignment file to enrichment, in one session"),
+          div(class = "lr-grid",
+              div(class = "lr-card", div(class = "lr-step", "Step 1"), tags$h3("Import & cleaning"), tags$p("Upload 1\u20132 MS-DIAL .txt files. Data are reshaped, ion modes resolved (including cross-mode identity transfer), and duplicate features deduplicated.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 2"), tags$h3("Internal standards"), tags$p("QC standard signal by class, shown in both ion modes by default; hover any point for the exact standard name. Per-ISTD amount and units via CSV.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 3"), tags$h3("Normalisation"), tags$p("Blank background subtraction, IS-based quantitative normalisation, and optional unit-aware protein normalisation.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 4\u20135"), tags$h3("Visualisation"), tags$p("Interactive bar plots for a single species or every species in a class, with cascading ion-mode, adduct, and name filters and flexible grouping.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 6"), tags$h3("Export"), tags$p("Download wide or long CSV, filtered by class and value type (absolute or % of class total).")),
+              div(class = "lr-card", div(class = "lr-step", "Step 7"), tags$h3("PCA"), tags$p("Principal component analysis with group colouring, iQC overlay, and a loadings table.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 8"), tags$h3("Statistics"), tags$p("Unpaired t-test, one- and two-way ANOVA with multiple-testing correction, post-hoc tests, per-class summary, and downloadable results.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 8a"), tags$h3("Volcano plot"), tags$p("Interactive volcano of all tested features, coloured by direction, with significant labels repelled automatically.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 9"), tags$h3("Class bar plots"), tags$p("Faceted bars of every species in a class, with abundance-range filtering, significance highlighting, and group overlays.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 9b"), tags$h3("Heatmap"), tags$p("Z-scored heatmap of significant features with configurable clustering, palettes, and label toggles.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 10"), tags$h3("Enrichment"), tags$p("Lipid set enrichment (ORA or FGSEA) across class, fatty-acid identity, saturation, chain length, and ether subclass.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 11"), tags$h3("Correlation network"), tags$p("Pearson correlation network of significant species; node colour reflects direction, edge width reflects correlation strength.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 12"), tags$h3("Synthesis pathways"), tags$p("Enzyme-activity proxy scores (class ratios) as a z-scored heatmap with per-score group statistics \u2014 interpretive indicators, not flux."))
           )
       ),
-      div(class = "info-box", style = "margin-top: 14px;",
-          tags$strong("\U1F512 Data privacy: "),
-          "LipiRich does not store, transmit, or retain any data you upload. All files and
-      results exist only within your browser session and are permanently discarded when
-      you close the tab or the session ends. No data ever leaves the server in any
-      persistent form."
-      ),
-      
-      # ── Publication & citation ──
-      tags$h2("Publication & Citation"),
-      div(class = "pub-grid",
-          div(class = "pub-card",
-              div(class = "pub-label", "DOI"),
-              div(class = "pub-value", "Pending publication")
-          ),
-          div(class = "pub-card",
-              div(class = "pub-label", "GitHub Repository"),
-              div(class = "pub-value", "https://github.com/sarahehancock/LipiRich")
-          ),
-          div(class = "pub-card",
-              div(class = "pub-label", "Preprint"),
-              div(class = "pub-value", "Pending upload")
-          ),
-          div(class = "pub-card",
-              div(class = "pub-label", "License"),
-              div(class = "pub-value", "AGPL-3.0 License")
+
+      # ── Data prep ──
+      div(class = "lr-section",
+          div(class = "lr-eyebrow", "Before you upload"),
+          tags$h2("Preparing your data in MS-DIAL"),
+          tags$p("LipiRich reads the aligned result exported from MS-DIAL 5 as a tab-delimited .txt file. In MS-DIAL:"),
+          tags$ol(
+            tags$li(tags$strong("Run alignment"), " \u2014 complete peak picking and alignment as normal. Review the result, tag correctly identified species with the ", tags$strong("\u2713 checkmark"), ", then choose ", tags$strong("Filter by current parameter"), " on export to pass only checked features to LipiRich."),
+            tags$li(tags$strong("Export"), " \u2014 ", tags$em("Export \u2192 Alignment result"), " in ", tags$strong(".txt"), " format. LipiRich reads from row 5 (the four MS-DIAL header rows are skipped automatically)."),
+            tags$li(tags$strong("Sample naming"), " \u2014 end sample columns in ", tags$code("_pos"), " or ", tags$code("_neg"), " (e.g. ", tags$code("Sample1_pos"), "). These suffixes drive ion-mode resolution and sample-name deduplication."),
+            tags$li(tags$strong("Internal standards"), " \u2014 standard features must contain ", tags$code("[IS]"), " in the metabolite name, and their adduct must match the analytes they normalise (class + ion mode + adduct). These are detected automatically."),
+            tags$li(tags$strong("Both polarities"), " \u2014 export each mode as its own .txt and upload both together (max 2 files); LipiRich merges them."),
+            tags$li(tags$strong("Blank samples"), " \u2014 include at least one sample named ", tags$code("Blank"), " (case-insensitive) for background subtraction.")
           )
       ),
-      tags$p("If you use LipiRich in your research, please cite:"),
-      div(class = "cite-box",
-          "Hancock, SE. (2026). LipiRich: A Shiny application for normalisation,
-statistics, and visualisation of MS-DIAL lipidomics data (v0.2.2).
-GitHub: https://github.com/sarahehancock/LipiRich
-DOI: [pending]"
+
+      div(class = "lr-note",
+          tags$strong("Grouping: "), "group samples for plots and statistics by sample name, by a delimiter token (", tags$code("Sample1_rep1"), " \u2192 ", tags$code("Sample1"), "), or by a regex capture group \u2014 or upload a grouping CSV with ", tags$code("sample"), " and ", tags$code("group"), " columns (plus optional ", tags$code("factorA"), "/", tags$code("factorB"), " for two-way designs)."
       ),
-      
-      # ── Footer ──
-      div(class = "footer-note",
-          paste0("LipiRich v", APP_VERSION, " — Built with R Shiny — MS-DIAL 5.5.251021 compatible — AGPL-3.0 License")
+      div(class = "lr-note",
+          tags$strong("Technical replicates: "), "average technical injections per biological sample before PCA, statistics, and plots \u2014 via a ", tags$code("bio_sample"), " column in the grouping CSV, or by selecting sample-name tokens in Group Preview (including combined indices like ", tags$code("1-1"), " for bio 1, tech 1)."
+      ),
+
+      # ── Access ──
+      div(class = "lr-section",
+          div(class = "lr-eyebrow", "Access"),
+          tags$h2("Run it, or read the source"),
+          div(class = "lr-links",
+              div(class = "lr-linkcard", div(class = "lr-k", "Live web app"), div(class = "lr-v", tags$a(href = "https://lipirich.sarahehancock.com", target = "_blank", "lipirich.sarahehancock.com"))),
+              div(class = "lr-linkcard", div(class = "lr-k", "GitHub"), div(class = "lr-v", tags$a(href = "https://github.com/sarahehancock/LipiRich", target = "_blank", "github.com/sarahehancock/LipiRich")))
+          ),
+          div(class = "lr-note", style = "margin-top:14px;",
+              tags$strong("\U0001F512 Data privacy: "), "LipiRich does not store, transmit, or retain uploaded data. Files and results exist only in your browser session and are discarded when the tab or session closes."
+          )
+      ),
+
+      # ── Citation ──
+      div(class = "lr-section",
+          div(class = "lr-eyebrow", "Publication & citation"),
+          tags$h2("Citing LipiRich"),
+          div(class = "lr-links",
+              div(class = "lr-linkcard", div(class = "lr-k", "DOI"), div(class = "lr-v pending", "Pending publication")),
+              div(class = "lr-linkcard", div(class = "lr-k", "Preprint"), div(class = "lr-v pending", "Pending upload")),
+              div(class = "lr-linkcard", div(class = "lr-k", "Repository"), div(class = "lr-v", tags$a(href = "https://github.com/sarahehancock/LipiRich", target = "_blank", "github.com/sarahehancock/LipiRich"))),
+              div(class = "lr-linkcard", div(class = "lr-k", "License"), div(class = "lr-v", "AGPL-3.0"))
+          ),
+          tags$p(style = "margin-top:14px;", "If you use LipiRich in your research, please cite:"),
+          div(class = "lr-cite",
+              paste0("Hancock, SE. (2026). LipiRich: A Shiny application for normalisation,\nstatistics, and visualisation of MS-DIAL lipidomics data (v", APP_VERSION, ").\nGitHub: https://github.com/sarahehancock/LipiRich\nDOI: [pending]")
+          )
+      ),
+
+      div(class = "lr-footer",
+          paste0("LipiRich v", APP_VERSION, "  \u00b7  R Shiny  \u00b7  MS-DIAL 5.5.251021 compatible  \u00b7  AGPL-3.0")
       )
   )
 }
@@ -987,7 +782,80 @@ ui <- fluidPage(
                                   class = "btn-sm btn-default")
                    )
             )
+          ),
+          tags$hr(),
+          h4("Cross-mode identity (negative ID \u2192 positive quantitation)"),
+          div(class = "info-box", style = "margin-bottom:16px;",
+              tags$strong("What this does:"),
+              tags$br(),
+              "For the classes listed below, LipiRich takes the ",
+              tags$strong("quantitation from the positive-mode feature"),
+              " (which has an adduct-matched positive internal standard) and transfers the ",
+              tags$strong("acyl-resolved identity from the matching negative-mode feature"),
+              ", pairing them by sum-composition shorthand plus retention time. ",
+              "This mirrors the LipidSearch-style workflow: negative mode resolves the fatty ",
+              "acids (all four chains for CL), positive mode gives the more consistent precursor ",
+              "for quantitation. ",
+              tags$br(), tags$br(),
+              "A positive feature with no negative match is kept at sum composition; a ",
+              "negative feature with no positive match is retained and quantified from its own ",
+              "negative-mode IS. When the toggle is off, these classes revert to prefer-negative ",
+              "handling. Internal standards are never touched. Every decision is listed in the ",
+              "audit table so the reassignment is fully traceable."
+          ),
+          fluidRow(
+            column(width = 5,
+                   wellPanel(
+                     checkboxInput("cross_mode_enable",
+                                   "Enable cross-mode identity transfer",
+                                   value = TRUE),
+                     helpText(tags$small(
+                       "One class per line — must match the MS-DIAL class exactly.",
+                       "Only classes with adduct-matched positive internal standards",
+                       "and positive analytes should be listed here."
+                     )),
+                     textAreaInput(
+                       "cross_mode_classes",
+                       label = "Classes: quant positive, identity negative",
+                       value = paste(c("PC","PE","PG","PI","PS","PA","CL"), collapse = "\n"),
+                       rows = 6, width = "100%"
+                     ),
+                     numericInput(
+                       "cross_mode_rt_tol",
+                       "RT match tolerance (min)",
+                       value = 0.1, min = 0, max = 2, step = 0.01
+                     )
+                   )
+            ),
+            column(width = 7,
+                   div(class = "info-box", style = "margin-top:8px;",
+                       tags$strong("Reconciliation audit"),
+                       " has its own tab for a wider view \u2014 see the ",
+                       tags$strong("\U1F4CB Cross-mode audit"), " tab. Every re-identification, ",
+                       "sum-composition retention, and negative-only feature is listed there, ",
+                       "and it reloads whenever the data or these settings change."
+                   )
+            )
           )
+        ),
+        
+        # ── Cross-mode audit tab ──────────────────────────────────────────────
+        tabPanel(
+          title = tagList(tags$span("\U1F4CB Cross-mode audit")),
+          value = "cross_mode_audit",
+          h4("Cross-mode identity reconciliation audit"),
+          div(class = "info-box", style = "margin-bottom:16px;",
+              "Each row records how a designated-class feature (configured under ",
+              tags$strong("\u2699\ufe0f Settings \u2192 Cross-mode identity"),
+              ") was resolved. ",
+              tags$strong("Final identity"), " is the label the feature carries downstream and ",
+              tags$strong("Quant mode"), " is the ion mode its abundance is taken from: positive ",
+              "features re-identified from the matching negative feature (",
+              tags$em("pos quant / neg id"), "), positive features kept at the depth positive can ",
+              "determine (", tags$em("sum composition"), ", or positive substructure for CL), and ",
+              "negative-only features retained and negative-quantified. Reloads with the data."
+          ),
+          DTOutput("crossModeAuditTable")
         ),
         
         # ── Group Preview tab ─────────────────────────────────────────────────
@@ -1103,7 +971,7 @@ ui <- fluidPage(
                            "Positive only" = "pos",
                            "Both (separate)" = "both"
                          ),
-                         selected = "auto"
+                         selected = "both"
                        ),
                        selectInput(
                          "error_type_is", "Error bars",
@@ -1278,14 +1146,21 @@ ui <- fluidPage(
                          selected = "absolute"
                        ),
                        selectInput("met_class", "Lipid Class", choices = "Loading..."),
+                       radioButtons("met_ion_mode", "Ion mode",
+                                    choices = c("All modes" = "all",
+                                                "Positive"  = "positive",
+                                                "Negative"  = "negative"),
+                                    selected = "all", inline = TRUE),
                        selectInput("met_name", "Metabolite name", choices = "Select a class first"),
                        selectInput("met_adduct_filter", "Adduct filter",
                                    choices = c("All" = "all"),
                                    selected = "all"),
                        helpText(tags$small(
-                         "Filter to a specific adduct type. Auto-populates from the selected class.",
-                         "When multiple adducts are present (e.g. from adduct-matched IS),",
-                         "each adduct produces a separate normalised value."
+                         "Ion mode, adduct, and name cascade: the name list only shows",
+                         "species that have data under the current mode and adduct, so a",
+                         "selection always plots. After cross-mode reconciliation most",
+                         "species resolve to a single quant mode; use these to inspect",
+                         "classes kept in both modes."
                        )),
                        tags$hr(),
                        h5("Groups to plot"),
@@ -2243,6 +2118,7 @@ server <- function(input, output, session) {
   .default_pref_neg <- c("PC","PE","PG","PI","PS","PA","CL","PC-O","PE-O")
   .default_pref_pos <- c("TG","DG","MG","CE","Cer","HexCer","SM",
                          "LPC","LPE","LPG","LPI","LPS","LPA")
+  .default_cross_mode <- c("PC","PE","PG","PI","PS","PA","CL")
   
   # Reset button
   observeEvent(input$settings_reset, {
@@ -2250,6 +2126,10 @@ server <- function(input, output, session) {
                         value = paste(.default_pref_neg, collapse = "\n"))
     updateTextAreaInput(session, "pref_pos_classes",
                         value = paste(.default_pref_pos, collapse = "\n"))
+    updateTextAreaInput(session, "cross_mode_classes",
+                        value = paste(.default_cross_mode, collapse = "\n"))
+    updateCheckboxInput(session, "cross_mode_enable", value = TRUE)
+    updateNumericInput(session, "cross_mode_rt_tol", value = 0.1)
   })
   
   # Reactive helpers to parse current preference lists from textarea
@@ -2263,6 +2143,39 @@ server <- function(input, output, session) {
     cls <- stringr::str_trim(unlist(strsplit(x, "\n")))
     cls[nzchar(cls)]
   })
+  cross_mode_classes <- reactive({
+    x <- input$cross_mode_classes %||% ""
+    cls <- stringr::str_trim(unlist(strsplit(x, "\n")))
+    cls[nzchar(cls)]
+  })
+  
+  # Audit map for the cross-mode reconciliation (recomputed independently of the
+  # main pipeline so the table stays available even after downstream mutates).
+  cross_mode_audit <- reactive({
+    if (!isTRUE(input$cross_mode_enable)) return(NULL)
+    cm_classes <- cross_mode_classes()
+    if (length(cm_classes) == 0) return(NULL)
+    req(bg_norm_long())
+    cm_rt_tol <- suppressWarnings(as.numeric(input$cross_mode_rt_tol %||% 0.1))
+    if (length(cm_rt_tol) != 1 || is.na(cm_rt_tol) || cm_rt_tol < 0) cm_rt_tol <- 0.1
+    df <- resolve_cross_mode(bg_norm_long(), cm_classes, rt_tol = cm_rt_tol)
+    attr(df, "cross_mode_map")
+  })
+  
+  output$crossModeAuditTable <- DT::renderDT({
+    m <- cross_mode_audit()
+    validate(need(!is.null(m) && nrow(m) > 0,
+                  "Cross-mode identity transfer is off, or no designated-class features were found."))
+    m %>%
+      dplyr::mutate(dplyr::across(dplyr::where(is.numeric), ~ round(.x, 4))) %>%
+      dplyr::rename(
+        Class = class, Shorthand = shorthand,
+        `Positive feature` = pos_name, `Pos RT` = pos_rt, `Pos adduct` = pos_adduct,
+        `Negative identity` = neg_identity, `Neg RT` = neg_rt, `dRT` = delta_rt,
+        `Final identity` = final_identity, `Quant mode` = quant_mode, Status = status
+      )
+  }, options = list(pageLength = 15, scrollX = TRUE, order = list()),
+     rownames = FALSE)
   
   # ── Token preview server logic ─────────────────────────────────────────────────
   
@@ -3491,6 +3404,177 @@ server <- function(input, output, session) {
                     -dplyr::any_of(c("mode_pref", "has_preferred")))
   }
   
+  # ---------- Cross-mode identity reconciliation (neg identity -> pos quant) ----------
+  # For designated classes (default PC, PE, PI, PS, CL) the positive-mode feature is
+  # the quantitation source (it has an adduct-matched positive IS), while its
+  # acyl-resolved identity is transferred from the negative-mode feature of the same
+  # species, matched by sum-composition shorthand (text before "|") + retention time
+  # within `rt_tol` minutes. Negative mode resolves individual fatty acids that
+  # positive mode reports only as sum composition (or, for CL, as the two combined
+  # halves), so identity is authoritative in negative and quantitation in positive.
+  #
+  #   - Positive feature WITH a negative match : positive sample values are kept
+  #       (quant); Metabolite name is replaced by the negative acyl identity.
+  #   - Positive feature WITHOUT a negative match : retained and positive-quantified,
+  #       shown at the depth positive can determine — sum composition for
+  #       glycerophospholipids, positive substructure kept for CL.
+  #   - Negative feature WITHOUT a positive match : retained and quantified from its
+  #       own (negative) mode IS.
+  #   - Multiple negative isomers matching one positive : nearest-RT wins the identity;
+  #       any losing isomer with no positive match of its own is retained as neg-only.
+  #   - IS rows and all non-designated classes pass through untouched.
+  #
+  # The main long data frame is returned with an unchanged schema (only rows dropped
+  # and Metabolite name rewritten). A per-decision audit tibble is attached as
+  # attr(., "cross_mode_map") for display and reproducibility.
+  # `pos_substructure_classes`: classes for which the POSITIVE annotation carries
+  # genuine (if partial) structure worth keeping when unmatched — e.g. CL, whose
+  # positive feature resolves the two combined halves. For all other cross-mode
+  # classes (the glycerophospholipids) a positive acyl assignment is unreliable, so
+  # an unmatched positive is collapsed to sum composition (the depth positive can
+  # actually determine). A matched positive always takes the negative acyl identity.
+  resolve_cross_mode <- function(df, cross_classes, rt_tol = 0.1,
+                                 pos_substructure_classes = c("CL")) {
+    empty_map <- tibble::tibble(
+      class = character(0), shorthand = character(0),
+      pos_name = character(0), pos_rt = numeric(0), pos_adduct = character(0),
+      neg_identity = character(0), neg_rt = numeric(0),
+      delta_rt = numeric(0), final_identity = character(0),
+      quant_mode = character(0), status = character(0)
+    )
+    req_cols <- c("class", "ion.mode", "Metabolite name", "Adduct type",
+                  "Average Rt(min)", "sample")
+    if (length(cross_classes) == 0 || any(!req_cols %in% names(df))) {
+      attr(df, "cross_mode_map") <- empty_map
+      return(df)
+    }
+    if (is.na(rt_tol) || rt_tol < 0) rt_tol <- 0.1
+    
+    shorthand_of <- function(x) stringr::str_trim(sub("\\|.*$", "", x))
+    feat_key     <- function(nm, ad, rt)
+      paste(nm, ad, sprintf("%.4f", as.numeric(rt)), sep = "\u0001")
+    
+    df <- df %>%
+      dplyr::mutate(.is_is = stringr::str_detect(`Metabolite name`, "\\[IS\\]"))
+    in_scope <- (df$class %in% cross_classes) & !df$.is_is
+    df_cm   <- df[in_scope, , drop = FALSE]
+    df_rest <- df[!in_scope, , drop = FALSE]
+    
+    if (nrow(df_cm) == 0) {
+      out <- df_rest %>% dplyr::select(-.is_is)
+      attr(out, "cross_mode_map") <- empty_map
+      return(out)
+    }
+    
+    # Feature-level view: one row per physical feature (not per sample).
+    # `Average Rt(min)` can arrive as character from the MS-DIAL export, so carry a
+    # numeric copy (.rt) for the RT arithmetic and leave the original column untouched.
+    feats <- df_cm %>%
+      dplyr::distinct(class, ion.mode, `Metabolite name`, `Adduct type`, `Average Rt(min)`) %>%
+      dplyr::mutate(shorthand = shorthand_of(`Metabolite name`),
+                    .rt = suppressWarnings(as.numeric(`Average Rt(min)`)))
+    pos_f <- feats %>% dplyr::filter(ion.mode == "positive")
+    neg_f <- feats %>% dplyr::filter(ion.mode == "negative")
+    
+    matches <- pos_f %>%
+      dplyr::inner_join(neg_f, by = c("class", "shorthand"),
+                        suffix = c("_pos", "_neg"),
+                        relationship = "many-to-many") %>%
+      dplyr::filter(!is.na(.rt_pos), !is.na(.rt_neg)) %>%
+      dplyr::mutate(delta_rt = abs(.rt_pos - .rt_neg)) %>%
+      dplyr::filter(delta_rt <= rt_tol) %>%
+      dplyr::group_by(class, `Metabolite name_pos`, `Adduct type_pos`, `Average Rt(min)_pos`) %>%
+      dplyr::slice_min(delta_rt, n = 1, with_ties = FALSE) %>%
+      dplyr::ungroup()
+    
+    # Rewrite matched positive features to their negative acyl identity
+    rename_tbl <- if (nrow(matches) > 0) {
+      matches %>%
+        dplyr::transmute(
+          .k = feat_key(`Metabolite name_pos`, `Adduct type_pos`, `Average Rt(min)_pos`),
+          new_name = `Metabolite name_neg`
+        ) %>%
+        dplyr::distinct(.k, .keep_all = TRUE)
+    } else {
+      tibble::tibble(.k = character(0), new_name = character(0))
+    }
+    
+    # Negative donor features (consumed as identity source -> drop their sample rows)
+    neg_consumed <- if (nrow(matches) > 0) {
+      feat_key(matches$`Metabolite name_neg`, matches$`Adduct type_neg`,
+               matches$`Average Rt(min)_neg`)
+    } else character(0)
+    
+    df_cm <- df_cm %>%
+      dplyr::mutate(.k = feat_key(`Metabolite name`, `Adduct type`, `Average Rt(min)`)) %>%
+      dplyr::left_join(rename_tbl, by = ".k") %>%
+      dplyr::mutate(.shorthand = shorthand_of(`Metabolite name`))
+    keep <- !(df_cm$ion.mode == "negative" & df_cm$.k %in% neg_consumed)
+    df_cm <- df_cm[keep, , drop = FALSE] %>%
+      dplyr::mutate(
+        `Metabolite name` = dplyr::case_when(
+          # matched positive -> negative acyl identity
+          ion.mode == "positive" & !is.na(new_name)              ~ new_name,
+          # unmatched positive, class keeps positive substructure (e.g. CL) -> as-is
+          ion.mode == "positive" & class %in% pos_substructure_classes ~ `Metabolite name`,
+          # unmatched positive glycerophospholipid -> sum composition only
+          ion.mode == "positive"                                 ~ .shorthand,
+          # negatives (matched donors already dropped) -> keep full acyl identity
+          TRUE                                                   ~ `Metabolite name`
+        )
+      ) %>%
+      dplyr::select(-.k, -new_name, -.shorthand)
+    
+    out <- dplyr::bind_rows(df_rest, df_cm) %>% dplyr::select(-.is_is)
+    
+    # ---- Audit map ----
+    matched_map <- if (nrow(matches) > 0) {
+      matches %>%
+        dplyr::transmute(
+          class, shorthand,
+          pos_name = `Metabolite name_pos`, pos_rt = .rt_pos,
+          pos_adduct = `Adduct type_pos`,
+          neg_identity = `Metabolite name_neg`, neg_rt = .rt_neg,
+          delta_rt,
+          final_identity = `Metabolite name_neg`, quant_mode = "positive",
+          status = "pos quant / neg id"
+        )
+    } else empty_map
+    
+    matched_pos_keys <- if (nrow(matches) > 0)
+      feat_key(matches$`Metabolite name_pos`, matches$`Adduct type_pos`,
+               matches$`Average Rt(min)_pos`) else character(0)
+    pos_unmatched <- pos_f %>%
+      dplyr::mutate(.k = feat_key(`Metabolite name`, `Adduct type`, `Average Rt(min)`)) %>%
+      dplyr::filter(!.k %in% matched_pos_keys) %>%
+      dplyr::transmute(
+        class, shorthand, pos_name = `Metabolite name`, pos_rt = .rt,
+        pos_adduct = `Adduct type`, neg_identity = NA_character_, neg_rt = NA_real_,
+        delta_rt = NA_real_,
+        final_identity = dplyr::if_else(class %in% pos_substructure_classes,
+                                        `Metabolite name`, shorthand),
+        quant_mode = "positive",
+        status = dplyr::if_else(class %in% pos_substructure_classes,
+                                "pos only (positive substructure)",
+                                "pos only (sum composition)")
+      )
+    neg_unmatched <- neg_f %>%
+      dplyr::mutate(.k = feat_key(`Metabolite name`, `Adduct type`, `Average Rt(min)`)) %>%
+      dplyr::filter(!.k %in% neg_consumed) %>%
+      dplyr::transmute(
+        class, shorthand, pos_name = NA_character_, pos_rt = NA_real_,
+        pos_adduct = NA_character_, neg_identity = `Metabolite name`,
+        neg_rt = .rt, delta_rt = NA_real_,
+        final_identity = `Metabolite name`, quant_mode = "negative",
+        status = "neg only (neg-quantified)"
+      )
+    
+    attr(out, "cross_mode_map") <-
+      dplyr::bind_rows(matched_map, pos_unmatched, neg_unmatched) %>%
+      dplyr::arrange(class, shorthand, dplyr::desc(status))
+    out
+  }
+  
   append_duplicate_counters <- function(df) {
     feature_keys <- c("Average Rt(min)", "Average Mz", "Adduct type", "class", "ion.mode", "Metabolite name")
     feature_map <- df %>%
@@ -3584,9 +3668,23 @@ server <- function(input, output, session) {
   
   bg_norm_pre_outlier <- reactive({
     req(bg_norm_long())
-    df_res <- resolve_ion_modes(bg_norm_long(),
-                                pref_neg = pref_neg_classes(),
-                                pref_pos = pref_pos_classes())
+    
+    # Cross-mode identity reconciliation (neg identity -> pos quant) runs first,
+    # for its designated classes only. Those classes are then excluded from the
+    # prefer-neg/prefer-pos lists so resolve_ion_modes() does not touch them again;
+    # when the toggle is off they revert to their normal (prefer-negative) handling.
+    cm_on      <- isTRUE(input$cross_mode_enable)
+    cm_classes <- if (cm_on) cross_mode_classes() else character(0)
+    cm_rt_tol  <- suppressWarnings(as.numeric(input$cross_mode_rt_tol %||% 0.1))
+    if (length(cm_rt_tol) != 1 || is.na(cm_rt_tol) || cm_rt_tol < 0) cm_rt_tol <- 0.1
+    
+    df_src <- bg_norm_long()
+    if (cm_on && length(cm_classes) > 0)
+      df_src <- resolve_cross_mode(df_src, cm_classes, rt_tol = cm_rt_tol)
+    
+    df_res <- resolve_ion_modes(df_src,
+                                pref_neg = setdiff(pref_neg_classes(), cm_classes),
+                                pref_pos = setdiff(pref_pos_classes(), cm_classes))
     df_res <- append_duplicate_counters(df_res)
     df_res <- add_plot_class_variant(df_res)
     df_res <- df_res %>%
@@ -4008,7 +4106,8 @@ server <- function(input, output, session) {
       dplyr::mutate(
         class = tidyr::replace_na(class, "Unknown"),
         ion.mode = dplyr::coalesce(ion.mode, "unknown"),
-        sample_norm = coalesce(sample_norm, normalize_sample_name(sample))
+        sample_norm = coalesce(sample_norm, normalize_sample_name(sample)),
+        istd_name = dplyr::coalesce(istd_name, "unknown IS")
       ) %>%
       dplyr::filter(class == input$is_class)
     
@@ -4103,32 +4202,46 @@ server <- function(input, output, session) {
     )
   }, ignoreInit = FALSE)
   
-  met_names_available <- reactive({
+  # Shared class + ion-mode slice for the single-lipid tab (drives both the adduct
+  # and name selectors so they always agree with what will actually plot).
+  met_class_df <- reactive({
     req(bg_norm_long_avg(), input$met_class)
-    bg_norm_long_avg() %>%
-      dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
-      dplyr::filter(plot_class == input$met_class) %>%
+    df <- bg_norm_long_avg() %>%
+      dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"),
+                    plot_class == input$met_class)
+    mode_sel <- input$met_ion_mode %||% "all"
+    if (!identical(mode_sel, "all") && "ion.mode" %in% names(df))
+      df <- df %>% dplyr::filter(ion.mode == mode_sel)
+    df
+  })
+  
+  met_names_available <- reactive({
+    df <- met_class_df()
+    adduct_sel <- input$met_adduct_filter %||% "all"
+    if (!is.null(adduct_sel) && adduct_sel != "all" && nzchar(adduct_sel))
+      df <- df %>% dplyr::filter(`Adduct type` == adduct_sel)
+    df %>%
       dplyr::distinct(`Metabolite name`) %>%
       dplyr::arrange(`Metabolite name`) %>%
       dplyr::pull(`Metabolite name`)
   })
   
-  observeEvent(input$met_class, {
-    choices <- met_names_available()
-    choices <- c("Total (class sum)", choices)
+  # Name list cascades off class + ion mode + adduct; preserve the current
+  # selection when it is still valid, otherwise fall back to the class total.
+  observeEvent(list(input$met_class, input$met_ion_mode, input$met_adduct_filter), {
+    nm <- tryCatch(met_names_available(), error = function(e) character(0))
+    choices <- c("Total (class sum)", nm)
+    cur <- isolate(input$met_name)
+    sel <- if (!is.null(cur) && cur %in% choices) cur else "Total (class sum)"
     updateSelectInput(session, "met_name",
-                      choices = if (length(choices) > 0) choices else "No metabolites in this class",
-                      selected = if (length(choices) > 0) "Total (class sum)" else "No metabolites in this class"
-    )
+                      choices  = if (length(choices) > 0) choices else "No metabolites in this class",
+                      selected = if (length(choices) > 0) sel else "No metabolites in this class")
   }, ignoreInit = FALSE)
   
   # ── Adduct filter reactives ────────────────────────────────────────────────────
-  # Returns adducts available for the current class in the normalised data
+  # Returns adducts available for the current class + ion mode
   met_adducts_available <- reactive({
-    req(bg_norm_long_avg(), input$met_class)
-    adducts <- bg_norm_long_avg() %>%
-      dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"),
-                    plot_class == input$met_class) %>%
+    adducts <- met_class_df() %>%
       dplyr::distinct(`Adduct type`) %>%
       dplyr::pull(`Adduct type`)
     sort(unique(adducts[!is.na(adducts) & nzchar(adducts)]))
@@ -4144,8 +4257,8 @@ server <- function(input, output, session) {
     sort(unique(adducts[!is.na(adducts) & nzchar(adducts)]))
   })
   
-  # Update adduct selectors when class changes
-  observeEvent(input$met_class, {
+  # Update adduct selector when class or ion mode changes (reset to All)
+  observeEvent(list(input$met_class, input$met_ion_mode), {
     adducts <- tryCatch(met_adducts_available(), error = function(e) character(0))
     choices  <- c("All" = "all", setNames(adducts, adducts))
     updateSelectInput(session, "met_adduct_filter",
@@ -4187,11 +4300,19 @@ server <- function(input, output, session) {
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
       dplyr::filter(plot_class == input$met_class)
     
+    # --- Ion-mode filter (cascades with the name/adduct selectors)
+    mode_sel <- input$met_ion_mode %||% "all"
+    if (!identical(mode_sel, "all") && "ion.mode" %in% names(df))
+      df <- df %>% dplyr::filter(ion.mode == mode_sel)
+    
     # --- Adduct filter (if not "All")
     adduct_sel <- input$met_adduct_filter
     if (!is.null(adduct_sel) && adduct_sel != "all" && nzchar(adduct_sel))
       df <- df %>% dplyr::filter(`Adduct type` == adduct_sel)
     measure_col <- pick_measure_col(input$plot_value_type_met)
+    # Ensure norm_units exists (avoids "unknown column" warnings when a filtered
+    # slice or a non-normalised value type has no units column)
+    if (!"norm_units" %in% names(df)) df$norm_units <- NA_character_
     
     # --- Class totals per sample — used for percent mode
     class_totals <- df %>%
@@ -4232,7 +4353,7 @@ server <- function(input, output, session) {
         dplyr::transmute(
           sample, plot_class, `Metabolite name`,
           value = .data[[measure_col]],
-          norm_units = if (measure_col == "norm") .data$norm_units else NA_character_
+          norm_units = if (measure_col == "norm") norm_units else NA_character_
         ) %>%
         dplyr::left_join(class_totals, by = "sample")
       
@@ -5037,7 +5158,10 @@ server <- function(input, output, session) {
                       position = position_dodge(width = 0.6), width = 0.2) +
         geom_point(data = df_pts,
                    aes(x = group, y = IS_value, colour = ion.mode,
-                       text = paste0("Sample: ", sample, "<br>IS value: ", round(IS_value, 2))),
+                       text = paste0("IS: ", istd_name,
+                                     "<br>Sample: ", sample,
+                                     "<br>Ion mode: ", ion.mode,
+                                     "<br>IS value: ", round(IS_value, 2))),
                    position = position_jitterdodge(jitter.width = 0.12, dodge.width = 0.6),
                    alpha = 0.7, size = 2) +
         labs(title = paste0("IS Values (Class: ", input$is_class, ") — Both ion modes"),
@@ -5056,7 +5180,9 @@ server <- function(input, output, session) {
                       width = 0.2, colour = "#333") +
         geom_jitter(data = df_pts,
                     aes(x = group, y = IS_value,
-                        text = paste0("Sample: ", sample, "<br>IS value: ", round(IS_value, 2))),
+                        text = paste0("IS: ", istd_name,
+                                      "<br>Sample: ", sample,
+                                      "<br>IS value: ", round(IS_value, 2))),
                     width = 0.12, height = 0, alpha = 0.6, size = 2, colour = "#E45756") +
         labs(title = paste0("IS Values (Class: ", input$is_class, ") — ",
                             switch(mode_sel,
@@ -5316,8 +5442,7 @@ server <- function(input, output, session) {
     
     plot_height <- max(400, length(unique(df_sum$`Metabolite name`)) * 30)
     
-    ggplotly(p, tooltip = "text") %>%
-      layout(height = plot_height)
+    ggplotly(p, tooltip = "text", height = plot_height)
   })
   
   
@@ -8431,12 +8556,9 @@ server <- function(input, output, session) {
       df_pts <- df %>%
         dplyr::mutate(
           species = factor(`Metabolite name`, levels = feat_order),
-          pt_fill = dplyr::case_when(
-            pt_fill_mode == "palette" ~ pal[as.character(group)],
-            pt_fill_mode == "black"   ~ "#222222",
-            pt_fill_mode == "white"   ~ "#ffffff",
-            TRUE ~ pal[as.character(group)]
-          )
+          pt_fill = if (pt_fill_mode == "black") "#222222"
+                    else if (pt_fill_mode == "white") "#ffffff"
+                    else pal[as.character(group)]
         )
       
       # Shape 21 always — outline=none achieved by matching colour to fill
@@ -8454,11 +8576,9 @@ server <- function(input, output, session) {
         size        = pt_size,
         stroke      = pt_stroke,
         fill        = df_pts$pt_fill,
-        colour      = dplyr::case_when(
-          pt_outline_mode == "none"  ~ df_pts$pt_fill,
-          pt_outline_mode == "black" ~ "#222222",
-          TRUE                       ~ "white"
-        ),
+        colour      = if (pt_outline_mode == "none") df_pts$pt_fill
+                      else if (pt_outline_mode == "black") "#222222"
+                      else "white",
         alpha       = 0.92,
         inherit.aes = FALSE
       )
@@ -9198,9 +9318,9 @@ server <- function(input, output, session) {
     
     wide <- df %>%
       dplyr::filter(`Metabolite name` %in% feats, group == grp) %>%
-      dplyr::select(sample, `Metabolite name`, .data[[measure_col]]) %>%
+      dplyr::select(sample, `Metabolite name`, dplyr::all_of(measure_col)) %>%
       tidyr::pivot_wider(names_from  = `Metabolite name`,
-                         values_from = .data[[measure_col]]) %>%
+                         values_from = dplyr::all_of(measure_col)) %>%
       tibble::column_to_rownames("sample")
     
     if (nrow(wide) < 3) {
@@ -9212,6 +9332,13 @@ server <- function(input, output, session) {
     M <- as.matrix(wide)
     M[!is.finite(M)] <- NA
     M <- M[, colSums(is.finite(M)) >= 3, drop = FALSE]
+    # Drop zero-variance (constant) features so cor() does not warn or return NA
+    if (ncol(M) > 0) {
+      keep_var <- vapply(seq_len(ncol(M)),
+                         function(j) { v <- stats::var(M[, j], na.rm = TRUE); is.finite(v) && v > 0 },
+                         logical(1))
+      M <- M[, keep_var, drop = FALSE]
+    }
     
     if (ncol(M) < 2) {
       showNotification("Too few complete features for correlation.", type = "warning")

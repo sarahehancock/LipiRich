@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.2.2-blue" alt="v0.2.2"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.5.2-informational" alt="R 4.5.2"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.3.0-blue" alt="v0.3.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.6.1-informational" alt="R 4.6.1"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
-> Developed and tested with **MS-DIAL 5.5.251021**, R 4.5.2, and Bioconductor 3.22.
+> Developed and tested with **MS-DIAL 5.5.251021**, R 4.6.1, and Bioconductor 3.23.
 
-> ⚠️ **Pre-publication software (v0.2.2):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.3.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -14,11 +14,12 @@
 |---|---|
 | **Data import** | Upload 1–2 MS-DIAL aligned `.txt` files; positive and negative ion modes merged automatically |
 | **Ion mode deduplication** | Per-class mode preference rules (user-configurable) ensure each species is represented by its most informative ion mode |
-| **Internal standards** | QC plots and per-ISTD quantification; IS matched by class, ion mode, and adduct type |
+| **Cross-mode identity** | For glycerophospholipids and cardiolipin, optionally quantify from the positive-mode feature while transferring the acyl-resolved identity from the retention-time-matched negative-mode feature; unmatched species are retained at the depth their own mode can determine. A dedicated audit tab records every reassignment |
+| **Internal standards** | QC plots (positive and negative shown together by default, with the exact standard name on hover) and per-ISTD quantification; IS matched by class, ion mode, and adduct type |
 | **Normalisation** | Blank subtraction followed by IS-based quantitative normalisation, with optional protein normalisation |
 | **Protein Match** | Diagnostic check confirming every imported sample has a matching protein CSV entry (and vice versa), before relying on protein normalisation |
 | **Outlier Detection** | Sample-level (PCA Hotelling's T², iQC replicate deviation) and feature-level (modified Z-score / IQR) outlier flagging, with bulk and individual exclusion that propagates to every downstream tab |
-| **Visualisation** | Interactive bar plots per lipid species and per class, with adduct-type filtering |
+| **Visualisation** | Interactive bar plots per lipid species and per class; the single-species tab has cascading ion-mode, adduct-type, and name filters that only offer selections with data |
 | **Export** | Wide and long-format CSV export with class and unit filtering |
 | **PCA** | Principal component analysis with token-based group colouring, sample selection, and iQC/ISTD projected as supplementary (non-fit-influencing) points |
 | **Statistics** | Auto t-test / one-way ANOVA / two-way ANOVA with post-hoc tests, volcano plot, and significance heatmap |
@@ -26,13 +27,13 @@
 | **Enrichment** | ORA and FGSEA across lipid class, fatty acid identity, saturation, chain length, and ether subclass sets |
 | **Correlation Network** | Pearson correlation network of significant lipid species within a selected group |
 | **Synthesis Pathways** | Curated enzyme activity proxy scores with group comparison statistics |
-| **Settings** | User-editable ion mode preference lists per lipid class |
+| **Settings** | User-editable ion mode preference lists per lipid class, and the cross-mode identity reconciliation toggle, class list, and RT tolerance |
 
 ---
 
 ## Getting Started
 
-> **New here?** The [step-by-step tutorial](https://github.com/sarahehancock/LipiRich/blob/main/demo_data/MSDIAL_processing_tutorial.md) walks through every tab using the bundled demo dataset.
+> **New here?** The [step-by-step tutorial](TUTORIAL.md) walks through every tab using the bundled demo dataset.
 
 ### Option 1 — Use the live web app
 
@@ -46,7 +47,7 @@ The easiest way to use LipiRich is via the hosted instance — no installation r
 
 ### Option 2 — Run locally in R
 
-**Requirements:** R ≥ 4.5.2
+**Requirements:** R ≥ 4.6.1
 
 1. Clone the repository:
    ```bash
@@ -134,6 +135,17 @@ When data are acquired in both positive and negative mode, some lipid species ma
 These defaults reflect established ionisation behaviour for each lipid class (e.g. glycerophospholipids ionise more efficiently and with greater structural information in negative mode; neutral lipids in positive mode). They can be edited per-session in the **⚙️ Settings** tab without reloading data.
 
 IS rows are always retained from whichever ion mode they were detected in, regardless of the class preference rules.
+
+### Cross-mode identity reconciliation
+
+For classes where negative mode resolves fatty-acyl detail that positive mode reports only as sum composition — the glycerophospholipids (PC, PE, PG, PI, PS, PA) and cardiolipin (CL) — LipiRich can go beyond simply preferring one mode. When enabled (the default), each positive-mode feature is paired to a negative-mode feature of the same sum composition and retention time, and:
+
+- the **quantitation** is taken from the positive-mode feature (which has an adduct-matched positive internal standard), while
+- the **identity** is transferred from the negative-mode feature (which resolves the individual acyl chains — all four for CL, versus the two combined halves positive mode reports).
+
+A species is therefore quantified once, not double-counted across modes. Unmatched features are never dropped: a positive-only feature is shown at the depth positive mode can determine (sum composition, or the two combined halves for CL), a negative-only feature keeps its full acyl identity, and each is quantified from its own-mode standard. Every decision — re-identification, sum-composition retention, or negative-only retention — is listed in the **📋 Cross-mode audit** tab, showing the final identity and the ion mode each abundance is drawn from.
+
+This mirrors the way structural lipidomics workflows resolve identity in negative mode and quantify in positive. It requires that the reconciled classes have an adduct-matched positive internal standard; the behaviour, the class list, and the retention-time tolerance are all configurable in the **⚙️ Settings** tab, and it can be turned off to revert those classes to prefer-negative handling.
 
 ---
 
@@ -399,7 +411,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.2.2). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.3.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 

@@ -1,10 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # LipiDash — Dockerfile
-# Base: rocker/shiny-verse (R 4.5.2 + Shiny Server + tidyverse pre-installed)
-# Bioconductor: 3.22
+# Base: rocker/shiny-verse (R 4.6.1 + Shiny Server + tidyverse pre-installed)
+# Bioconductor: 3.23
 # ─────────────────────────────────────────────────────────────────────────────
 
-FROM rocker/shiny-verse:4.5.2
+FROM rocker/shiny-verse:4.6.1
 
 # ── System dependencies ───────────────────────────────────────────────────────
 # libxml2-dev    → xml2 / curl
@@ -51,7 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── R package installation ────────────────────────────────────────────────────
 # ARG CACHE_BUST forces Docker to re-run the package install step when changed.
 # Update the value here whenever you want a clean reinstall (e.g. new packages.R)
-ARG CACHE_BUST=2026-05-17b
+ARG CACHE_BUST=2026-08-01
 COPY packages.R /tmp/packages.R
 RUN Rscript /tmp/packages.R
 
