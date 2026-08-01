@@ -158,7 +158,7 @@ An example of an incorrect identification of CL 69:5 can be seen in the screensh
 
 ### Other common issues
 
-Isomeric TG peaks are often detected as poorly resolved. MS-DIAL usually does a reasonable job deconvoluting them, but manual peak selection is sometimes required. The Annotation listed in the Sample table can help determine which peak belongs to which species. In the example below, three isomeric TG species are poorly resolved: TG 14:0_16:0_22:6 (1), TG 16:0_16:1_20:5 (2), and TG 16:1_18:2_18:3 (3). Inspection of the annotation for each chromatogram shows species (1) is the last peak, species (2) is the middle peak, and species (3) is the first peak.
+Isomeric TG peaks are often detected as poorly resolved peaks. MS-DIAL usually does a reasonable job deconvoluting them, but manual peak selection is sometimes required. The Annotation listed in the Sample table can help determine which peak belongs to which species. In the example below, three isomeric TG species are poorly resolved: TG 14:0_16:0_22:6 (1), TG 16:0_16:1_20:5 (2), and TG 16:1_18:2_18:3 (3). Inspection of the annotation for each chromatogram shows species (1) is the last peak, species (2) is the middle peak, and species (3) is the first peak.
 
 Species (1):
 ![peak1.png](images/peak1.png)
