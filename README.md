@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.3.0-blue" alt="v0.3.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.6.1-informational" alt="R 4.6.1"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.4.0-blue" alt="v0.4.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.6.1-informational" alt="R 4.6.1"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.6.1, and Bioconductor 3.23.
 
-> ⚠️ **Pre-publication software (v0.3.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.4.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -24,7 +24,7 @@
 | **PCA** | Principal component analysis with token-based group colouring, sample selection, and iQC/ISTD projected as supplementary (non-fit-influencing) points |
 | **Statistics** | Auto t-test / one-way ANOVA / two-way ANOVA with post-hoc tests, volcano plot, and significance heatmap |
 | **Class Bar Plots** | Faceted bar plots of all species within a selected lipid class post-statistics, with abundance range filtering and significance highlighting |
-| **Enrichment** | ORA and FGSEA across lipid class, fatty acid identity, saturation, chain length, and ether subclass sets |
+| **Enrichment** | ORA and FGSEA across lipid class, fatty acid identity, saturation, chain length, odd-chain, and ether subclass sets |
 | **Correlation Network** | Pearson correlation network of significant lipid species within a selected group |
 | **Synthesis Pathways** | Curated enzyme activity proxy scores with group comparison statistics |
 | **Settings** | User-editable ion mode preference lists per lipid class, and the cross-mode identity reconciliation toggle, class list, and RT tolerance |
@@ -411,7 +411,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.3.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.4.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 

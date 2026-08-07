@@ -8,6 +8,27 @@
 
 ---
 
+## [0.4.0] — 2026-08-07
+
+### Added
+
+#### Odd-chain fatty-acid enrichment sets
+The lipid-set enrichment step (ORA and FGSEA) can now test for odd-chain fatty acids. In FA-resolved mode, a new **Odd-Chain FA** set is built across the whole dataset (`All: Odd-Chain FA`) and within each class (`<class>: Odd-Chain FA`), containing every species that carries at least one odd-numbered acyl chain. Membership is deliberately at the species level: a species with one odd and one even chain is counted as odd-chain, because odd-chain fatty acids seldom occur as diacyl pairs and their presence at all is the biologically meaningful event. This lets you ask, for a given dataset, whether odd-chain species are over-represented among the statistically significant lipids more often than expected by chance.
+
+#### Odd-chain fatty-acid length bins
+In FA-resolved mode, odd-chain acyl chains are now binned on their own odd-centred length ladder — `FAlen(odd)` at ≤15, 17, 19, 21, 23 and ≥25 carbons — mirroring the existing even-centred `FAlen` bins and computed over odd chains only. Previously odd chains were folded into the even-labelled length bins, which obscured their distribution.
+
+#### Odd-chain sets in sum-composition mode
+When enrichment is run in sum-composition mode, an **Odd-Chain (sum)** set is built globally (`All: Odd-Chain (sum)`) and per class from odd total-carbon parity, so the odd-chain question can still be asked when FA-level detail is unavailable. Note the inherent limitation of inferring from totals: a species bearing two odd chains sums to an even total and is therefore not captured in sum mode — FA-resolved mode detects these directly.
+
+Even-chain sets are intentionally not offered in either mode. Even-chain is the biosynthetic default (fatty-acid synthase elongates two carbons at a time), and in a two-category parity contrast “even-chain enrichment” is the mathematical inverse of odd-chain depletion, so reporting it as a separate finding would be misleading. Even chains remain the implicit reference (the feature universe minus the odd-chain set).
+
+### Fixed
+
+- **FGSEA warning noise and p-value estimation.** `fgseaMultilevel` now runs serially (`nproc = 1L`), which removes the repeated BiocParallel `'package:stats' may not be available` serialize warnings emitted when parallel workers were spun up. `eps` is set to `0` so p-values below 1e-6 are estimated properly rather than floored and flagged as overestimated. `nPermSimple` is raised to 10000 to reduce the number of pathways left as `NA` (pval/padj/NES) under unbalanced, one-sided rank distributions — common in one-vs-rest lipidomics comparisons. Sets whose members sit entirely on one side of a strongly one-sided ranking may still return `NA`; ORA is the more appropriate test in that situation.
+
+---
+
 ## [0.3.0] — 2026-08-01
 
 ### Added

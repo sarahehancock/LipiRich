@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.3.0
+# LipiRich v0.4.0
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.3.0
+# Version:  0.4.0
 # Tested with: MS-DIAL 5.5.251021, R 4.6.1, Bioconductor 3.23
 # --------------------------
 
-APP_VERSION <- "0.3.0"
+APP_VERSION <- "0.4.0"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -6834,6 +6834,12 @@ server <- function(input, output, session) {
       if (length(idx)) sets[[paste0("All: totalC ", tc)]] <- ann$`Metabolite name`[idx]
     }
     
+    # 2b) Global: odd total-carbon species (inferred odd-chain). Even omitted as the
+    #     biological default. NB: a species with TWO odd chains sums to EVEN and is
+    #     therefore missed here; use resolved mode for direct odd-chain detection.
+    odd_idx <- which(is.finite(ann$total_c) & (ann$total_c %% 2 == 1))
+    if (length(odd_idx)) sets[["All: Odd-Chain (sum)"]] <- ann$`Metabolite name`[odd_idx]
+
     # 3) Global: exact total double bonds (DB)
     for (db in sort(unique(stats::na.omit(ann$total_db)))) {
       idx <- which(ann$total_db == db)
@@ -6855,6 +6861,10 @@ server <- function(input, output, session) {
         idx <- which(sub$total_c == tc)
         if (length(idx)) sets[[paste0(cl, ": totalC ", tc)]] <- sub$`Metabolite name`[idx]
       }
+
+      # Odd total-carbon species within this class (even omitted; di-odd blind spot as above)
+      odd_idx <- which(is.finite(sub$total_c) & (sub$total_c %% 2 == 1))
+      if (length(odd_idx)) sets[[paste0(cl, ": Odd-Chain (sum)")]] <- sub$`Metabolite name`[odd_idx]
       
       for (db in sort(unique(stats::na.omit(sub$total_db)))) {
         idx <- which(sub$total_db == db)
@@ -6992,6 +7002,22 @@ server <- function(input, output, session) {
         fa_info$ether_type[fa_info$is_ether_fa & fa_info$db == 0] <- "plasmanyl"
         fa_info$ether_type[fa_info$is_ether_fa & fa_info$db >= 1] <- "plasmenyl"
         # Note: Only O-XX:0 or O-XX:1 are mapped as requested; others remain NA.
+
+        # (NEW) Odd/even chain parity from FA carbon number
+        fa_info$chain_parity <- dplyr::case_when(
+          is.na(fa_info$len)    ~ NA_character_,
+          fa_info$len %% 2 == 1 ~ "odd-chain",
+          TRUE                  ~ "even-chain"
+        )
+
+        # (NEW) Odd-chain FA length bins (odd-centred ladder, mirrors the even bins)
+        # NA for even chains, so only odd-chain FAs contribute to these sets.
+        fa_info$len_bin_odd <- cut(
+          fa_info$len,
+          breaks = c(-Inf, 15, 17, 19, 21, 23, Inf),
+          labels = c("≤15", "17", "19", "21", "23", "≥25")
+        )
+        fa_info$len_bin_odd[!(fa_info$chain_parity %in% "odd-chain")] <- NA
         
         # Map FA token -> lipids
         fa2lip <- split(all_pairs$lipid, all_pairs$fa)
@@ -7027,6 +7053,24 @@ server <- function(input, output, session) {
             sets[[paste0("All: Ether FA ", etype)]] <- unique(unlist(fa2lip[famem], use.names = FALSE))
           }
         }
+
+        # (NEW) (6) Global odd-chain set (species containing >=1 odd-numbered acyl chain).
+        # Even-chain is the biological default and serves only as the implicit reference
+        # (universe minus this set), so it is intentionally NOT built as a reportable set.
+        for (cp in intersect("odd-chain", fa_info$chain_parity)) {
+          famem <- fa_info$fa[fa_info$chain_parity == cp]
+          if (length(famem)) {
+            sets[["All: Odd-Chain FA"]] <- unique(unlist(fa2lip[famem], use.names = FALSE))
+          }
+        }
+
+        # (NEW) (7) Global odd-chain FA length bins
+        for (lb in na.omit(levels(fa_info$len_bin_odd))) {
+          famem <- fa_info$fa[which(as.character(fa_info$len_bin_odd) == lb)]
+          if (length(famem)) {
+            sets[[paste0("All: FAlen(odd) ", lb)]] <- unique(unlist(fa2lip[famem], use.names = FALSE))
+          }
+        }
         
         # Per-class (by base_class) variants for FAcat / FAlen / length classes / Ether FA types
         for (bc in unique(all_pairs$base_class)) {
@@ -7060,6 +7104,20 @@ server <- function(input, output, session) {
             famem <- fa_info$fa[fa_info$ether_type == etype]
             lipids <- unique(unlist(sub_map[intersect(names(sub_map), famem)], use.names = FALSE))
             if (length(lipids)) sets[[paste0(bc, ": Ether FA ", etype)]] <- lipids
+          }
+
+          # (NEW) Odd-chain set per base class (even-chain intentionally not built; see above)
+          for (cp in intersect("odd-chain", fa_info$chain_parity)) {
+            famem <- fa_info$fa[fa_info$chain_parity == cp]
+            lipids <- unique(unlist(sub_map[intersect(names(sub_map), famem)], use.names = FALSE))
+            if (length(lipids)) sets[[paste0(bc, ": Odd-Chain FA")]] <- lipids
+          }
+
+          # (NEW) Odd-chain FA length bins per base class
+          for (lb in na.omit(levels(fa_info$len_bin_odd))) {
+            famem <- fa_info$fa[which(as.character(fa_info$len_bin_odd) == lb)]
+            lipids <- unique(unlist(sub_map[intersect(names(sub_map), famem)], use.names = FALSE))
+            if (length(lipids)) sets[[paste0(bc, ": FAlen(odd) ", lb)]] <- lipids
           }
         }
       }
@@ -7298,7 +7356,7 @@ server <- function(input, output, session) {
   
   
   
-  run_fgsea_safe <- function(ranks, sets, minSize = 3, maxSize = 5000, eps = 1e-6) {
+  run_fgsea_safe <- function(ranks, sets, minSize = 3, maxSize = 5000, eps = 0, nPermSimple = 10000) {
     # Preconditions
     if (!requireNamespace("fgsea", quietly = TRUE)) {
       stop("Package 'fgsea' is not installed/loaded.")
@@ -7319,13 +7377,19 @@ server <- function(input, output, session) {
     clean_sets <- clean_sets[keep]
     if (length(clean_sets) == 0) return(NULL)
     
-    # Use fgseaMultilevel (recommended) — no nperm, no parallel
+    # Use fgseaMultilevel (recommended). Serial (nproc = 1) avoids BiocParallel
+    # worker spin-up and its "'package:stats' may not be available" serialize
+    # warnings; eps = 0 lets very small p-values be estimated below 1e-6;
+    # nPermSimple raises the simple-permutation count to reduce pathways left
+    # NA under unbalanced (one-sided) rank distributions.
     res <- fgsea::fgseaMultilevel(
-      pathways = clean_sets,
-      stats    = ranks,
-      minSize  = minSize,
-      maxSize  = maxSize,
-      eps      = eps
+      pathways    = clean_sets,
+      stats       = ranks,
+      minSize     = minSize,
+      maxSize     = maxSize,
+      eps         = eps,
+      nPermSimple = nPermSimple,
+      nproc       = 1L
     )
     
     if (is.null(res) || nrow(res) == 0) return(NULL)
