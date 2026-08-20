@@ -276,13 +276,19 @@ The Statistics tab automatically selects the appropriate test based on the numbe
 - **≥ 3 groups** → one-way ANOVA
 - **Two-way design** → two-way ANOVA using Factor A and Factor B defined in the Group Preview tab
 
-Groups to include in the comparison are selected via the group selector on the Statistics tab, which inherits from the Group Preview tab settings. Deselect groups to exclude them from all tests. All downstream tabs (Volcano Plot, Heatmap, Enrichment, Correlation Network, Synthesis Pathways) inherit the statistics results from the most recent "Run statistics" click, and restrict their outputs to the selected groups only.
+Groups to include in the comparison are selected via the group selector on the Statistics tab, which inherits from the Group Preview tab settings. Deselect groups to exclude them from all tests.
 
 Multiple testing correction (FDR/BH, Bonferroni, or none) and significance threshold (α) are configurable. Post-hoc tests (Tukey HSD, pairwise t-tests with Holm correction) are available for ANOVA results.
 
 A collapsible **per-class summary panel** shows the number of species detected, tested, significant, and percentage significant for each lipid class, with a CSV download.
 
-### Volcano plot
+---
+
+## Plotting
+
+Three plotting steps consume the most recent "Run statistics" result and are grouped together in the app as **Step 9a–9c**. All downstream tabs (Volcano Plot, Class Bar Plots, Heatmap, Enrichment, Correlation Network, Synthesis Pathways) inherit the statistics results from the most recent "Run statistics" click, and restrict their outputs to the selected groups only.
+
+### Volcano plot (Step 9a)
 
 The volcano plot displays **all tested features** regardless of the significance filter applied to the bar plots and table. Points are coloured by direction (up/down/NS) according to the configured log2FC and p-value thresholds. Significant feature labels use native plotly annotations in the interactive view and ggrepel in PNG/SVG exports. The plot is interactive (hover for feature details) and can be exported as PNG or SVG.
 
@@ -290,17 +296,11 @@ For **ANOVA (≥ 3 groups)** results, a **Comparison** selector appears in the s
 
 An optional **axis capping** mode clamps the -log10(p) and log2FC axes to user-defined limits. Features beyond the cap are plotted at the cap value as filled triangles (▲), keeping the rest of the plot readable without hiding any data. True values remain accessible via hover text.
 
-### Significance heatmap
+### Class Bar Plots (Step 9b)
 
-Displays the top N significant features as a z-scored heatmap. Row and column clustering, row/column label visibility, and colour palette (10 options including diverging schemes) are all configurable. Column clustering is automatically disabled for 2-group (t-test) results. Exported as PNG or SVG with user-specified pixel dimensions and DPI.
+The Class Bar Plots tab displays all lipid species within a selected class as a **single grouped bar plot** with one colour per group, using the data and group assignments from the most recent statistics run. All groups selected on the Statistics tab are shown, in the order set on the **Group Preview** tab (see [Manual Group Order](#manual-group-order)).
 
----
-
-## Class Bar Plots
-
-The Class Bar Plots tab displays all lipid species within a selected class as a **single grouped bar plot** with one colour per group, using the data and group assignments from the most recent statistics run. All groups selected on the Statistics tab are shown.
-
-### Controls
+#### Controls
 
 **Data** — select a lipid class (populated immediately on data load), the value type (IS-normalised or background-subtracted), and the units for the y-axis label.
 
@@ -317,6 +317,10 @@ The Class Bar Plots tab displays all lipid species within a selected class as a 
 - **Species ordering** — alphabetical (default) or by descending mean abundance.
 
 **Significance brackets** — drawn automatically on the plot using the same pairwise test logic as the Statistics tab bar plots. For t-test (2 groups): a single bracket spanning both bars. For ANOVA (≥3 groups): one stacked bracket per significant Tukey HSD pairwise comparison. Symbols follow the standard convention (`*` p < 0.05, `**` p < 0.01, `***` p < 0.001).
+
+### Heatmap (Step 9c)
+
+Displays the top N significant features as a z-scored heatmap. Row and column clustering, row/column label visibility, and colour palette (10 options including diverging schemes) are all configurable. Column clustering is automatically disabled for 2-group (t-test) results. Group-mean column order follows the [Manual Group Order](#manual-group-order) setting; per-sample columns remain alphabetical. Exported as PNG or SVG with user-specified pixel dimensions and DPI.
 
 ---
 
