@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.4.0-blue" alt="v0.4.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.6.1-informational" alt="R 4.6.1"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.5.0-blue" alt="v0.5.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.6.1-informational" alt="R 4.6.1"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.6.1, and Bioconductor 3.23.
 
-> ⚠️ **Pre-publication software (v0.4.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.5.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -20,11 +20,12 @@
 | **Protein Match** | Diagnostic check confirming every imported sample has a matching protein CSV entry (and vice versa), before relying on protein normalisation |
 | **Outlier Detection** | Sample-level (PCA Hotelling's T², iQC replicate deviation) and feature-level (modified Z-score / IQR) outlier flagging, with bulk and individual exclusion that propagates to every downstream tab |
 | **Visualisation** | Interactive bar plots per lipid species and per class; the single-species tab has cascading ion-mode, adduct-type, and name filters that only offer selections with data |
+| **Group Order** | Manual control of group plotting order across bar plots and heatmaps, via a grouping CSV `order` column or a drag-to-reorder list |
 | **Export** | Wide and long-format CSV export with class and unit filtering |
 | **PCA** | Principal component analysis with token-based group colouring, sample selection, and iQC/ISTD projected as supplementary (non-fit-influencing) points |
 | **Statistics** | Auto t-test / one-way ANOVA / two-way ANOVA with post-hoc tests, volcano plot, and significance heatmap |
 | **Class Bar Plots** | Faceted bar plots of all species within a selected lipid class post-statistics, with abundance range filtering and significance highlighting |
-| **Enrichment** | ORA and FGSEA across lipid class, fatty acid identity, saturation, chain length, odd-chain, and ether subclass sets |
+| **Enrichment** | ORA and FGSEA across lipid class, fatty acid identity, saturation, chain length, and ether subclass sets |
 | **Correlation Network** | Pearson correlation network of significant lipid species within a selected group |
 | **Synthesis Pathways** | Curated enzyme activity proxy scores with group comparison statistics |
 | **Settings** | User-editable ion mode preference lists per lipid class, and the cross-mode identity reconciliation toggle, class list, and RT tolerance |
@@ -176,8 +177,18 @@ To assign groups explicitly — particularly useful for complex experimental des
 | `group` | Yes | Group label for plots and statistics |
 | `factorA` | No | Factor A label for two-way ANOVA designs |
 | `factorB` | No | Factor B label for two-way ANOVA designs |
+| `order` | No | Numeric value controlling group plotting order (see **Manual Group Order** below) |
 
 When a grouping CSV is uploaded and enabled, it takes priority over token-based grouping across all tabs. Blank, iQC, and ISTD-named samples are automatically excluded from group selectors regardless of method.
+
+### Manual Group Order
+
+By default, groups are plotted in the order they first appear in your data. To control this — e.g. to plot a control group first, or order groups by dose or timepoint — LipiRich supports two approaches, set in the **Group Order** section of the Group Preview tab:
+
+- **Grouping CSV `order` column** — add a numeric `order` value to one or more rows of your grouping CSV (see table above). If several samples in the same group carry different values, the smallest one sets that group's position. Groups without a value are placed after ordered groups, in their default order.
+- **Drag list** — reorder groups directly in the Group Preview tab by dragging. Used whenever the CSV has no `order` column, the CSV order option is disabled, or no grouping CSV is in use. New groups are appended automatically; removed groups drop out.
+
+Priority when both are available: **CSV `order` column → drag list → default (first-appearance) order.** This ordering applies to group axes in bar plots, group-mean heatmap columns, and other grouped visualisations across LipiRich. It does not control the order of individual samples within a group (e.g. sample-level heatmap columns remain alphabetical).
 
 ---
 
@@ -411,7 +422,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.4.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.5.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 

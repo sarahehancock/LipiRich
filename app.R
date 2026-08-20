@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.4.0
+# LipiRich v0.5.0
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,17 +36,17 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.4.0
+# Version:  0.5.0
 # Tested with: MS-DIAL 5.5.251021, R 4.6.1, Bioconductor 3.23
 # --------------------------
 
-APP_VERSION <- "0.4.0"
+APP_VERSION <- "0.5.0"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
   library(ggplot2); library(stringr); library(plotly); library(FactoMineR)
   library(factoextra); library(tibble); library(rlang); library(ggpubr)
-  library(rstatix); library(pheatmap); library(svglite)
+  library(rstatix); library(pheatmap); library(svglite); library(sortable)
   # visNetwork loaded on demand in network tab
 })
 
@@ -142,18 +142,21 @@ build_group_map <- function(df) {
   cB      <- pick_col(df, c("factorB","FactorB","B","GroupB"))
   cBio    <- pick_col(df, c("bio_sample","biological_sample","biol_sample",
                             "parent_sample","BioSample","ParentSample","biosample"))
+  cOrder  <- pick_col(df, c("order","plot_order","sample_order","Order","PlotOrder","SampleOrder"))
   
   validate(need(!is.na(csample) && !is.na(cgroup),
                 "CSV must contain at least 'sample' and 'group' columns."))
   
-  key    <- canonicalize_sample(df[[csample]])
-  gmap   <- setNames(as.character(df[[cgroup]]), key)
-  amap   <- if (!is.na(cA))   setNames(as.character(df[[cA]]),   key) else NULL
-  bmap   <- if (!is.na(cB))   setNames(as.character(df[[cB]]),   key) else NULL
-  biomap <- if (!is.na(cBio)) setNames(as.character(df[[cBio]]), key) else NULL
+  key      <- canonicalize_sample(df[[csample]])
+  gmap     <- setNames(as.character(df[[cgroup]]), key)
+  amap     <- if (!is.na(cA))     setNames(as.character(df[[cA]]),     key) else NULL
+  bmap     <- if (!is.na(cB))     setNames(as.character(df[[cB]]),     key) else NULL
+  biomap   <- if (!is.na(cBio))   setNames(as.character(df[[cBio]]),   key) else NULL
+  ordermap <- if (!is.na(cOrder)) setNames(suppressWarnings(as.numeric(df[[cOrder]])), key) else NULL
   
-  list(group = gmap, factorA = amap, factorB = bmap, bio_sample = biomap,
-       colnames = list(sample = csample, group = cgroup, factorA = cA, factorB = cB, bio_sample = cBio))
+  list(group = gmap, factorA = amap, factorB = bmap, bio_sample = biomap, order = ordermap,
+       colnames = list(sample = csample, group = cgroup, factorA = cA, factorB = cB,
+                       bio_sample = cBio, order = cOrder))
 }
 
 # ---- Labelers that prefer the uploaded CSV, else fallback to your existing methods ----
@@ -460,9 +463,10 @@ landing_page_ui <- function() {
               div(class = "lr-card", div(class = "lr-step", "Step 6"), tags$h3("Export"), tags$p("Download wide or long CSV, filtered by class and value type (absolute or % of class total).")),
               div(class = "lr-card", div(class = "lr-step", "Step 7"), tags$h3("PCA"), tags$p("Principal component analysis with group colouring, iQC overlay, and a loadings table.")),
               div(class = "lr-card", div(class = "lr-step", "Step 8"), tags$h3("Statistics"), tags$p("Unpaired t-test, one- and two-way ANOVA with multiple-testing correction, post-hoc tests, per-class summary, and downloadable results.")),
-              div(class = "lr-card", div(class = "lr-step", "Step 8a"), tags$h3("Volcano plot"), tags$p("Interactive volcano of all tested features, coloured by direction, with significant labels repelled automatically.")),
-              div(class = "lr-card", div(class = "lr-step", "Step 9"), tags$h3("Class bar plots"), tags$p("Faceted bars of every species in a class, with abundance-range filtering, significance highlighting, and group overlays.")),
-              div(class = "lr-card", div(class = "lr-step", "Step 9b"), tags$h3("Heatmap"), tags$p("Z-scored heatmap of significant features with configurable clustering, palettes, and label toggles.")),
+              div(class = "lr-eyebrow", style = "grid-column: 1 / -1; margin-top: 8px;", "Plotting"),
+              div(class = "lr-card", div(class = "lr-step", "Step 9a"), tags$h3("Volcano plot"), tags$p("Interactive volcano of all tested features, coloured by direction, with significant labels repelled automatically.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 9b"), tags$h3("Class bar plots"), tags$p("Faceted bars of every species in a class, with abundance-range filtering, significance highlighting, and group overlays.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 9c"), tags$h3("Heatmap"), tags$p("Z-scored heatmap of significant features with configurable clustering, palettes, and label toggles.")),
               div(class = "lr-card", div(class = "lr-step", "Step 10"), tags$h3("Enrichment"), tags$p("Lipid set enrichment (ORA or FGSEA) across class, fatty-acid identity, saturation, chain length, and ether subclass.")),
               div(class = "lr-card", div(class = "lr-step", "Step 11"), tags$h3("Correlation network"), tags$p("Pearson correlation network of significant species; node colour reflects direction, edge width reflects correlation strength.")),
               div(class = "lr-card", div(class = "lr-step", "Step 12"), tags$h3("Synthesis pathways"), tags$p("Enzyme-activity proxy scores (class ratios) as a z-scored heatmap with per-score group statistics \u2014 interpretive indicators, not flux."))
@@ -615,7 +619,7 @@ ui <- fluidPage(
       verbatimTextOutput("protein_csv_summary"),
       fileInput(
         inputId = "group_csv",
-        label   = "Upload grouping CSV (sample, group[, factorA, factorB, bio_sample])",
+        label   = "Upload grouping CSV (sample, group[, factorA, factorB, bio_sample, order])",
         multiple = FALSE,
         accept   = c(".csv"),
         buttonLabel = "Browse..."
@@ -625,7 +629,13 @@ ui <- fluidPage(
         "Use uploaded CSV for grouping (and factors)",
         value = TRUE
       ),
-      helpText("CSV must contain columns 'sample' and 'group'; optional 'factorA', 'factorB', 'bio_sample'. Matching is case-insensitive on canonicalized sample names."),
+      helpText("CSV must contain columns 'sample' and 'group'; optional 'factorA', 'factorB', 'bio_sample', 'order'. Matching is case-insensitive on canonicalized sample names."),
+      helpText(tags$small(
+        "The optional ", tags$code("order"), " column sets manual ", tags$strong("group"),
+        " plotting order (numeric, low \u2192 high; the smallest value found for any sample",
+        " in a group sets that group's position). See the ", tags$strong("Group Order"),
+        " section of the Group Preview tab for the drag-list alternative and priority rules."
+      )),
       verbatimTextOutput("group_csv_summary"),
       tags$hr(),
       # ── Technical replicate averaging ───────────────────────────────────────
@@ -920,6 +930,44 @@ ui <- fluidPage(
                    DT::DTOutput("lr_group_preview_tbl"),
                    br(),
                    uiOutput("lr_token_summary_ui")
+            )
+          ),
+          tags$hr(),
+          # ── Group plotting order (optional) ──────────────────────────────────
+          h4("Group Order"),
+          helpText(tags$small(
+            "Sets the left-to-right group order used across LipiRich's bar plots, group-mean",
+            " heatmap columns, PCA, and other grouped visualisations. Individual sample order",
+            " within a group is not controlled \u2014 only which group appears where.",
+            " Priority: grouping CSV ", tags$code("order"), " column (if present and enabled) \u2192",
+            " manual drag order below \u2192 group's first appearance in the data."
+          )),
+          fluidRow(
+            column(width = 4,
+                   wellPanel(
+                     checkboxInput(
+                       "use_order_csv",
+                       "Use 'order' column from grouping CSV (if present)",
+                       value = TRUE
+                     ),
+                     helpText(tags$small(
+                       "Untick to always use the drag list, even if the uploaded grouping CSV",
+                       " has an ", tags$code("order"), " column."
+                     )),
+                     actionButton("lr_reset_group_order", "Reset drag list to default order",
+                                  icon = icon("rotate-left")),
+                     tags$hr(),
+                     verbatimTextOutput("group_order_source_summary")
+                   )
+            ),
+            column(width = 8,
+                   h5("Drag to reorder groups"),
+                   helpText(tags$small(
+                     "Used when the CSV order column is absent, disabled, or the box above is unticked.",
+                     " New or removed groups are reconciled automatically \u2014 new groups are",
+                     " appended at the end, removed groups drop out."
+                   )),
+                   uiOutput("lr_group_order_rank_ui")
             )
           )
         ),
@@ -1606,7 +1654,8 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Volcano Plot",
-                 h4("Step 8a: Volcano Plot"),
+                 tags$div(style = "font-family:monospace; font-size:.78em; letter-spacing:.08em; text-transform:uppercase; color:#0b6b66; font-weight:600; margin-bottom:2px;", "Plotting"),
+                 h4("Step 9a: Volcano Plot"),
                  fluidRow(
                    column(
                      width = 3,
@@ -1657,7 +1706,8 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Class Bar Plots",
-                 h4("Step 9: Class bar plots of significant features"),
+                 tags$div(style = "font-family:monospace; font-size:.78em; letter-spacing:.08em; text-transform:uppercase; color:#0b6b66; font-weight:600; margin-bottom:2px;", "Plotting"),
+                 h4("Step 9b: Class bar plots of significant features"),
                  fluidRow(
                    column(
                      width = 3,
@@ -1752,7 +1802,8 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Heatmap - significant",
-                 h4("Step 9b: Heatmap of statistically significant features"),
+                 tags$div(style = "font-family:monospace; font-size:.78em; letter-spacing:.08em; text-transform:uppercase; color:#0b6b66; font-weight:600; margin-bottom:2px;", "Plotting"),
+                 h4("Step 9c: Heatmap of statistically significant features"),
                  fluidRow(
                    column(
                      width = 3,
@@ -3144,6 +3195,7 @@ server <- function(input, output, session) {
       "', group: '", gm$colnames$group,
       if (!is.na(gm$colnames$factorA)) paste0("', factorA: '", gm$colnames$factorA) else "",
       if (!is.na(gm$colnames$factorB)) paste0("', factorB: '", gm$colnames$factorB) else "",
+      if (!is.na(gm$colnames$order))   paste0("', order: '", gm$colnames$order)   else "",
       "'."
     )
     if (!is.null(group_levels)) {
@@ -3156,6 +3208,128 @@ server <- function(input, output, session) {
       summary <- paste0(summary, "\nFactorB levels: ", paste(factorB_levels, collapse = ", "))
     }
     summary
+  })
+  
+  # ── Group plotting order — single source of truth ─────────────────────────
+  # Priority: grouping CSV 'order' column (if present & enabled, aggregated to
+  # one value per group) > manual drag order (Group Preview tab) > each
+  # group's first appearance in the data. Only group order is controlled;
+  # individual sample order within a group is left as-is.
+  
+  # Non-protected (biological) sample names in original file column order.
+  .biological_sample_choices <- reactive({
+    df <- tryCatch(data_clean(), error = function(e) NULL)
+    if (is.null(df)) return(character(0))
+    keep_meta   <- c("Average Rt(min)", "Average Mz", "Metabolite name", "Adduct type", "class", "ion.mode")
+    sample_cols <- setdiff(colnames(df), keep_meta)
+    sample_cols[!is_protected_sample(sample_cols)]
+  })
+  
+  # Distinct group labels in order of first appearance among biological samples.
+  .current_group_choices <- reactive({
+    samples <- .biological_sample_choices()
+    if (length(samples) == 0) return(character(0))
+    fn  <- tryCatch(get_active_grouping(), error = function(e) NULL)
+    if (is.null(fn)) return(character(0))
+    res <- tryCatch(fn(samples), error = function(e) NULL)
+    if (is.null(res) || is.null(res$group)) return(character(0))
+    unique(stats::na.omit(res$group))
+  })
+  
+  # Reconciles a stored manual group order against the current group set:
+  # keeps prior relative order for groups still present, appends new
+  # groups at the end, drops groups no longer present.
+  .reconcile_group_order <- function(prev_order, current_groups) {
+    if (is.null(prev_order) || length(prev_order) == 0) return(current_groups)
+    kept    <- prev_order[prev_order %in% current_groups]
+    new_ones <- setdiff(current_groups, kept)
+    c(kept, new_ones)
+  }
+  
+  group_order_state <- reactiveVal(NULL)
+  
+  observe({
+    current <- .current_group_choices()
+    if (length(current) == 0) return()
+    prev <- isolate(group_order_state())
+    reconciled <- .reconcile_group_order(prev, current)
+    if (!identical(reconciled, prev)) group_order_state(reconciled)
+  })
+  
+  observeEvent(input$lr_group_order_rank, {
+    group_order_state(input$lr_group_order_rank)
+  }, ignoreNULL = TRUE, ignoreInit = TRUE)
+  
+  observeEvent(input$lr_reset_group_order, {
+    group_order_state(.current_group_choices())
+  })
+  
+  output$lr_group_order_rank_ui <- renderUI({
+    labs <- group_order_state()
+    if (is.null(labs) || length(labs) == 0) {
+      return(helpText(tags$small(style = "color:#888;",
+                                 "Upload data and assign groups to populate the drag list.")))
+    }
+    sortable::rank_list(
+      text     = NULL,
+      labels   = labs,
+      input_id = "lr_group_order_rank"
+    )
+  })
+  
+  # CSV order column aggregated to one value per group (the smallest order
+  # value found among that group's samples), resolved against current groups.
+  .csv_group_order <- reactive({
+    if (!isTRUE(input$use_group_csv) || !isTRUE(input$use_order_csv) || is.null(input$group_csv))
+      return(NULL)
+    gm <- tryCatch(group_map(), error = function(e) NULL)
+    if (is.null(gm) || is.null(gm$order) || is.null(gm$group)) return(NULL)
+    current <- .current_group_choices()
+    if (length(current) == 0) return(NULL)
+    
+    keys <- names(gm$group)
+    df   <- data.frame(group = unname(gm$group[keys]), ord = unname(gm$order[keys]))
+    df   <- df[df$group %in% current & !is.na(df$ord), ]
+    if (nrow(df) == 0) return(NULL)
+    
+    agg <- stats::aggregate(ord ~ group, data = df, FUN = min)
+    agg <- agg[order(agg$ord), ]
+    ordered_groups <- agg$group
+    # Groups with no order value fall to the end, in their default (first-appearance) order
+    c(ordered_groups, setdiff(current, ordered_groups))
+  })
+  
+  output$group_order_source_summary <- renderText({
+    csv_ord <- .csv_group_order()
+    if (!is.null(csv_ord)) {
+      gm <- tryCatch(group_map(), error = function(e) NULL)
+      col_name <- if (!is.null(gm) && !is.na(gm$colnames$order)) gm$colnames$order else "order"
+      return(paste0("Active source: grouping CSV '", col_name, "' column."))
+    }
+    manual <- group_order_state()
+    if (!is.null(manual) && length(manual) > 0) {
+      return("Active source: manual drag order (Group Preview tab).")
+    }
+    "Active source: default order (no CSV order column or drag order set yet)."
+  })
+  
+  # Central reactive: returns a function(groups) -> ordered factor levels for `groups`.
+  get_active_group_order <- reactive({
+    csv_ord    <- .csv_group_order()
+    manual_ord <- group_order_state()
+    default_ord <- .current_group_choices()
+    
+    resolved <- if (!is.null(csv_ord)) csv_ord
+    else if (!is.null(manual_ord) && length(manual_ord) > 0) manual_ord
+    else default_ord
+    
+    function(groups) {
+      groups <- as.character(groups)
+      present <- unique(stats::na.omit(groups))
+      lv <- resolved[resolved %in% present]
+      extra <- setdiff(present, lv)  # groups unseen by the order source
+      c(lv, sort(extra))
+    }
   })
   
   
@@ -5209,8 +5383,9 @@ server <- function(input, output, session) {
     df_pts <- pd$points
     df_sum <- pd$summary
     
-    # Ensure group is a factor
-    df_sum$group <- factor(df_sum$group)
+    # Ensure group is a factor, ordered by the central group plotting order
+    grp_lv <- get_active_group_order()(df_pts$group)
+    df_sum$group <- factor(df_sum$group, levels = grp_lv)
     df_pts$group <- factor(df_pts$group, levels = levels(df_sum$group))
     group_levels <- levels(df_sum$group)
     
@@ -6030,8 +6205,9 @@ server <- function(input, output, session) {
       bar_group <- df %>%
         dplyr::mutate(bar_group = interaction(factorA, factorB, drop = TRUE))
     } else {
+      grp_lv <- get_active_group_order()(df$group)
       bar_group <- df %>%
-        dplyr::mutate(bar_group = factor(group))
+        dplyr::mutate(bar_group = factor(group, levels = grp_lv))
     }
     
     # (optional) defensively drop any rows where bar_group is NA, just in case
@@ -6173,10 +6349,11 @@ server <- function(input, output, session) {
     show_two_way <- any(stats_results_val()$test == "twoway")
     hasA <- any(!is.na(df_all$factorA))
     hasB <- any(!is.na(df_all$factorB))
+    grp_lv <- get_active_group_order()(df_all$group)
     df_all <- df_all %>%
       dplyr::mutate(bar_group = if (isTRUE(show_two_way) && hasA && hasB)
         interaction(factorA, factorB, drop = TRUE)
-        else factor(group)) %>%
+        else factor(group, levels = grp_lv)) %>%
       dplyr::filter(!is.na(bar_group))
     
     feats <- unique(c(levels(sdf$`Metabolite name`), sdf$`Metabolite name`))
@@ -6253,7 +6430,8 @@ server <- function(input, output, session) {
     if (isTRUE(show_two_way) && hasA && hasB) {
       df_all <- df_all %>% dplyr::mutate(bar_group = interaction(factorA, factorB, drop = TRUE))
     } else {
-      df_all <- df_all %>% dplyr::mutate(bar_group = factor(group))
+      grp_lv <- get_active_group_order()(df_all$group)
+      df_all <- df_all %>% dplyr::mutate(bar_group = factor(group, levels = grp_lv))
     }
     df_all <- df_all %>% dplyr::filter(!is.na(bar_group))
     if (nrow(df_all) == 0) return(NULL)
@@ -6488,7 +6666,8 @@ server <- function(input, output, session) {
         df_all <- df_all %>% dplyr::mutate(col_group = interaction(factorA, factorB, drop = TRUE))
         col_lab <- "A:B"
       } else {
-        df_all <- df_all %>% dplyr::mutate(col_group = factor(group))
+        grp_lv <- get_active_group_order()(df_all$group)
+        df_all <- df_all %>% dplyr::mutate(col_group = factor(group, levels = grp_lv))
         col_lab <- "Group"
       }
       

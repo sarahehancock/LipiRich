@@ -20,6 +20,7 @@ cran_packages <- c(
   "shiny",
   "DT",
   "shinyWidgets",
+  "sortable",
   "bslib",
   "htmltools",
   "htmlwidgets",
