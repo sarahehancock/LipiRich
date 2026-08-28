@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.5.0-blue" alt="v0.5.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.6.1-informational" alt="R 4.6.1"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.6.0-blue" alt="v0.6.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.6.1-informational" alt="R 4.6.1"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.6.1, and Bioconductor 3.23.
 
-> ⚠️ **Pre-publication software (v0.5.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.6.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -330,7 +330,14 @@ The Correlation Network tab computes pairwise **Pearson correlations** among sig
 
 > This tab is purely correlational — edges reflect co-variation in abundance, not metabolic pathway connectivity.
 
-Group selection is inherited from the Statistics tab: only groups included in the most recent statistics run are available in the group dropdown.
+Group selection is inherited from the Statistics tab: only groups included in the most recent statistics run are available in the group dropdown, in the order set by [Manual Group Order](#manual-group-order).
+
+### Exporting an image
+
+Two export options are available, alongside the edge-list CSV download:
+
+- **"Export network image (PNG)"** (button on the plot itself) — a browser screenshot of the interactive view exactly as arranged, including any manual node dragging. Quick, but PNG-only at browser-viewport resolution.
+- **"Export publication image"** (sidebar panel) — a separate static render (via `ggraph`) with the same width/height/DPI/scale controls and PNG/SVG output used by the other plot tabs (default 300 DPI). By default its node layout is independent of the interactive view; click **"Match on-screen layout"** first to read the current on-screen node positions into the export, so the two match node-for-node. A status line confirms once matched. Re-arranging nodes or rebuilding the network invalidates the match — click it again after either.
 
 ---
 
@@ -426,7 +433,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.5.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.6.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 

@@ -8,6 +8,35 @@
 
 ---
 
+## [0.6.0] — 2026-08-28
+
+### Added
+
+#### Correlation network image export
+The Correlation Network tab gains two ways to export a publication-quality image, alongside the existing edge-list CSV download. A one-click **"Export network image (PNG)"** button on the interactive widget itself captures the current on-screen arrangement (including any manual node dragging) as a screenshot, browser-resolution PNG. A new **"Export publication image"** panel in the sidebar renders a separate static image via `ggraph`/`igraph`, with the same width/height/DPI/scale controls and PNG/SVG output used elsewhere in the app (default 300 DPI, 2400×1800px). A new **"Match on-screen layout"** button reads the exact node positions from the interactive view and feeds them into the static export, so the two can be made to match node-for-node rather than relying on a different auto-layout algorithm; a status line confirms when the export is matched. New dependencies: `igraph`, `tidygraph`, `ggraph` (loaded on demand, consistent with `visNetwork`'s existing pattern).
+
+### Fixed
+
+#### Group Order not applied on several tabs
+Four tabs resolved grouping independently from `get_active_grouping()` rather than through the shared reactives touched in v0.5.0, so the Group Order setting silently had no effect on them:
+- **Class Bar Plots** — group bar order and colour-legend order now follow Group Order (`cbp_data()` / `.build_cbp()`).
+- **Enrichment** — the "Group(s) to analyze" list, its default selection, and the facet order on the enrichment plot now follow Group Order (`enrich_base_df()`, `available_groups_for_enrich()`, `lsea_plot_obj()`).
+- **Synthesis Pathways** — group order in the score statistics (t-test/ANOVA group labelling, fold-change direction), the "Higher in" legend, and group-mean heatmap columns now follow Group Order (`path_scores_long()`, `path_score_stats()`, `pathStatsPlot`).
+- **PCA, Statistics, single-metabolite plot, class-all plot, and Correlation Network group selectors** — all five were populated by a single shared helper (`.refresh_available_groups()`) that sorted alphabetically regardless of Group Order; now resolved through `get_active_group_order()`.
+
+#### FGSEA results not reproducible between identical runs
+`fgsea::fgseaMultilevel()` estimates its null distribution via internal Monte Carlo permutation and was never seeded, so re-running an unchanged one-vs-rest comparison (e.g. triggered by toggling an unrelated group in the selector) produced slightly different NES/p-values each time, even though the enrichment score (ES) itself was always identical and correct. A fixed seed is now set immediately before the FGSEA call. ORA was unaffected (closed-form hypergeometric test, no randomness) and was confirmed bit-for-bit identical across runs.
+
+#### Enrichment plot ranking sets from a global rather than per-group rank
+`reorder(label, NES)` (and the ORA equivalent) ranked each lipid set **once globally**, using the mean value across every group sharing that set name — so with multiple groups faceted together, a group's panel could show a ranking blended with other groups' values rather than its own. Sets are now ranked independently within each group's own facet, via a label+group composite key (`forcats::fct_reorder`), with the group suffix stripped back off for display. Table and CSV outputs were never affected, only the plot's visual ranking.
+
+### Changed
+
+#### Group Order UI safety net
+The drag-to-reorder list in the Group Preview tab's Group Order section is now wrapped in `tryCatch()`, so a rendering failure surfaces a visible error message instead of leaving the section silently blank.
+
+---
+
 ## [0.5.0] — 2026-08-20
 
 > **Note:** this project's `app.R` was already at v0.4.0 when this entry was written, with no corresponding CHANGELOG entry — a second undocumented gap alongside the known 0.1.0→0.2.0 gap. This entry covers only the changes made in the session that produced v0.5.0; the 0.3.0→0.4.0 changes are not retroactively documented here.

@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.5.0
+# LipiRich v0.6.0
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,18 +36,18 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.5.0
+# Version:  0.6.0
 # Tested with: MS-DIAL 5.5.251021, R 4.6.1, Bioconductor 3.23
 # --------------------------
 
-APP_VERSION <- "0.5.0"
+APP_VERSION <- "0.6.0"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
   library(ggplot2); library(stringr); library(plotly); library(FactoMineR)
   library(factoextra); library(tibble); library(rlang); library(ggpubr)
   library(rstatix); library(pheatmap); library(svglite); library(sortable)
-  # visNetwork loaded on demand in network tab
+  # visNetwork, igraph/tidygraph/ggraph loaded on demand in network tab
 })
 
 options(shiny.maxRequestSize = 100 * 1024^2)  # 100 MB
@@ -2009,7 +2009,30 @@ ui <- fluidPage(
                                     icon = icon("project-diagram"),
                                     style = "background-color:#28a745; color:#fff; border-color:#28a745; width:100%;"),
                        br(), br(),
-                       uiOutput("net_download_ui")
+                       uiOutput("net_download_ui"),
+                       hr(),
+                       h5("Export publication image"),
+                       helpText(tags$small(
+                         "Renders a separate static image with vector SVG and DPI-controlled",
+                         " PNG output (unlike the interactive widget above). By default it uses",
+                         " its own auto layout, which will", tags$strong(" not"),
+                         " match the interactive view's node positions. Arrange nodes above as",
+                         " you like (drag to declutter), then click below to make the export",
+                         " match exactly."
+                       )),
+                       actionButton("net_capture_layout", "Match on-screen layout",
+                                    icon = icon("crosshairs"), class = "btn-sm btn-default",
+                                    style = "width:100%;"),
+                       uiOutput("net_layout_status_ui"),
+                       br(),
+                       numericInput("net_export_width",  "Width (px)",     2400, 400, 6000, 50),
+                       numericInput("net_export_height", "Height (px)",    1800, 300, 6000, 50),
+                       numericInput("net_export_dpi",    "DPI",             300,  72,  600, 12),
+                       numericInput("net_export_scale",  "Scale fraction", 1.00, 0.25, 2.00, 0.05),
+                       fluidRow(
+                         column(6, downloadButton("download_net_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_net_svg", "SVG"))
+                       )
                      )
                    ),
                    column(
@@ -2657,7 +2680,7 @@ server <- function(input, output, session) {
     # Drop NA, empty, Unassigned, and any group label that looks like Blank/iQC/QC/ISTD/ITSD
     grps <- grps[!is.na(grps) & nzchar(grps) & grps != "Unassigned"]
     grps <- grps[!grepl("^(blank|iqc|qc|istd|itsd)$", grps, ignore.case = TRUE)]
-    sort(unique(grps))
+    get_active_group_order()(grps)
   })
   
   observe({
@@ -3270,10 +3293,16 @@ server <- function(input, output, session) {
       return(helpText(tags$small(style = "color:#888;",
                                  "Upload data and assign groups to populate the drag list.")))
     }
-    sortable::rank_list(
-      text     = NULL,
-      labels   = labs,
-      input_id = "lr_group_order_rank"
+    tryCatch(
+      sortable::rank_list(
+        text     = NULL,
+        labels   = labs,
+        input_id = "lr_group_order_rank"
+      ),
+      error = function(e) {
+        tags$div(style = "color:#c0392b;",
+                 tags$strong("Drag list failed to render: "), conditionMessage(e))
+      }
     )
   })
   
@@ -7364,6 +7393,8 @@ server <- function(input, output, session) {
     fn  <- get_active_grouping()
     res <- fn(df$sample)
     df$group <- res$group
+    grp_lv <- get_active_group_order()(df$group)
+    df$group <- factor(df$group, levels = grp_lv)
     
     # Respect the group selection from the Statistics tab
     sel_grps <- input$stats_selected_groups
@@ -7383,7 +7414,7 @@ server <- function(input, output, session) {
   # ---- Populate the group selector (server-side) ----
   available_groups_for_enrich <- reactive({
     req(enrich_base_df())
-    unique(enrich_base_df()$group)
+    levels(droplevels(enrich_base_df()$group))
   })
   observeEvent(enrich_base_df(), {
     choices <- available_groups_for_enrich()
@@ -7561,6 +7592,15 @@ server <- function(input, output, session) {
     # warnings; eps = 0 lets very small p-values be estimated below 1e-6;
     # nPermSimple raises the simple-permutation count to reduce pathways left
     # NA under unbalanced (one-sided) rank distributions.
+    #
+    # fgseaMultilevel estimates its null distribution via internal Monte Carlo
+    # permutation, so NES/pval/padj drift slightly between calls unless the
+    # random seed is pinned immediately beforehand — without this, re-running
+    # the same underlying one-vs-rest comparison for a group (e.g. triggered
+    # by toggling which OTHER groups are selected, which invalidates this
+    # reactive) produces small but real differences in NES and p-value for
+    # that group, even though the enrichment score (ES) itself is unchanged.
+    set.seed(123)
     res <- fgsea::fgseaMultilevel(
       pathways    = clean_sets,
       stats       = ranks,
@@ -7714,10 +7754,21 @@ server <- function(input, output, session) {
     res  <- lsea_results()
     topn <- input$lsea_topn; if (is.null(topn)) topn <- 30
     
+    if ("for_group" %in% names(res) && any(!is.na(res$for_group))) {
+      res$for_group <- factor(res$for_group, levels = get_active_group_order()(res$for_group))
+    }
+    
     if (identical(res$type[1], "FGSEA")) {
       top <- res %>% dplyr::group_by(for_group) %>% dplyr::slice_head(n = topn) %>% dplyr::ungroup()
-      p <- ggplot(top, aes(x = NES, y = reorder(label, NES), size = size, color = -log10(padj))) +
+      # reorder(label, NES) would rank each label ONCE globally (by mean NES
+      # across every group sharing that set name), so a facet's visual order
+      # reflects a cross-group blend rather than that group's own rank. Use a
+      # label+group composite key so each facet is ranked independently, then
+      # strip the group suffix back off for the axis text.
+      top$label_key <- forcats::fct_reorder(paste0(top$label, "\u0001", top$for_group), top$NES)
+      p <- ggplot(top, aes(x = NES, y = label_key, size = size, color = -log10(padj))) +
         geom_point() +
+        scale_y_discrete(labels = function(x) sub("\u0001.*$", "", x)) +
         labs(x = "Normalized Enrichment Score (NES)", y = "Set",
              color = "-log10(adj p)", size = "Set size") +
         theme_minimal(base_size = 12)
@@ -7726,8 +7777,11 @@ server <- function(input, output, session) {
       xval <- if (identical(input$ora_x_axis, "p")) -log10(pmax(top$p,     1e-300))
       else                                 -log10(pmax(top$p_adj, 1e-300))
       top$xval <- xval
-      p <- ggplot(top, aes(x = xval, y = reorder(label, xval), size = size, color = -log10(p))) +
+      # Same per-facet ranking fix as FGSEA above.
+      top$label_key <- forcats::fct_reorder(paste0(top$label, "\u0001", top$for_group), top$xval)
+      p <- ggplot(top, aes(x = xval, y = label_key, size = size, color = -log10(p))) +
         geom_point() +
+        scale_y_discrete(labels = function(x) sub("\u0001.*$", "", x)) +
         labs(x = if (identical(input$ora_x_axis, "p")) "-log10(p)" else "-log10(adj p)",
              y = "Set", size = "Set size", color = "-log10(p)") +
         theme_minimal(base_size = 12)
@@ -8162,9 +8216,11 @@ server <- function(input, output, session) {
     
     scores <- cbind(sample = wide$sample, as.data.frame(out, check.names = FALSE))
     
-    # Attach group labels (unchanged)
+    # Attach group labels, ordered per the central Group Order setting
     fn <- get_active_grouping()
     scores$group <- fn(scores$sample)$group
+    grp_lv <- get_active_group_order()(scores$group)
+    scores$group <- factor(scores$group, levels = grp_lv)
     
     
     
@@ -8375,7 +8431,7 @@ server <- function(input, output, session) {
       if (length(valid_grps) < 2) return(NULL)
       
       df_s <- df_s %>% dplyr::filter(group %in% valid_grps)
-      groups_present <- sort(unique(df_s$group))
+      groups_present <- levels(droplevels(factor(df_s$group, levels = levels(sc$group))))
       
       # Group means for direction / fold-change
       means <- df_s %>%
@@ -8457,10 +8513,12 @@ server <- function(input, output, session) {
         score_fct   = forcats::fct_reorder(score, neg_log10_p)
       )
     
+    dir_lv <- get_active_group_order()(res$direction)
     direction_colours <- setNames(
-      scales::hue_pal()(length(unique(res$direction))),
-      unique(res$direction)
+      scales::hue_pal()(length(dir_lv)),
+      dir_lv
     )
+    res$direction <- factor(res$direction, levels = dir_lv)
     
     ggplot2::ggplot(res, ggplot2::aes(
       x     = neg_log10_p,
@@ -8563,6 +8621,8 @@ server <- function(input, output, session) {
     fn  <- get_active_grouping()
     grp_res <- fn(df_long$sample)
     df_long$group <- grp_res$group
+    grp_lv <- get_active_group_order()(df_long$group)
+    df_long$group <- factor(df_long$group, levels = grp_lv)
     sel_grps <- input$stats_selected_groups
     if (!is.null(sel_grps) && length(sel_grps) > 0) {
       df_long <- df_long %>% dplyr::filter(group %in% sel_grps)
@@ -8706,12 +8766,13 @@ server <- function(input, output, session) {
     summ <- summ %>%
       dplyr::mutate(
         species   = factor(`Metabolite name`, levels = feat_order),
+        group     = factor(as.character(group), levels = levels(droplevels(factor(df$group)))),
         is_sig    = `Metabolite name` %in% d$sig_feats
       )
     
-    # Group colour palette
+    # Group colour palette — order follows the central Group Order setting
     n_groups     <- dplyr::n_distinct(summ$group)
-    group_levels <- sort(unique(summ$group))
+    group_levels <- levels(summ$group)
     palette_id   <- input$cbp_palette %||% "OkabeIto"
     bar_alpha    <- input$cbp_bar_alpha  %||% 0.85
     pt_size      <- input$cbp_point_size %||% 2.2
@@ -9509,6 +9570,30 @@ server <- function(input, output, session) {
   
   # Store edge list for download
   net_edge_data <- reactiveVal(NULL)
+  # Clean node/edge data (not baked into vis.js hex colours / HTML tooltips)
+  # for the static ggraph-based publication export
+  net_static_data <- reactiveVal(NULL)
+  # Captured on-screen node positions (id -> x, y), so the static export can
+  # match the interactive view's layout instead of using a different
+  # auto-layout algorithm. NULL until "Match on-screen layout" is clicked.
+  net_captured_positions <- reactiveVal(NULL)
+  
+  observeEvent(input$net_capture_layout, {
+    visNetwork::visNetworkProxy("net_plot") %>% visNetwork::visGetPositions()
+  })
+  
+  observeEvent(input$net_plot_positions, {
+    pos <- input$net_plot_positions
+    if (is.null(pos) || length(pos) == 0) {
+      showNotification("Could not read node positions \u2014 build the network first.", type = "warning")
+      return()
+    }
+    df <- dplyr::bind_rows(lapply(names(pos), function(id) {
+      data.frame(id = id, x = pos[[id]]$x, y = pos[[id]]$y, stringsAsFactors = FALSE)
+    }))
+    net_captured_positions(df)
+    showNotification("On-screen layout captured for export.", type = "message", duration = 4)
+  })
   
   observeEvent(input$net_run, {
     if (!requireNamespace("visNetwork", quietly = TRUE)) {
@@ -9696,6 +9781,27 @@ server <- function(input, output, session) {
       stringsAsFactors = FALSE
     )
     
+    net_static_data(list(
+      nodes = data.frame(
+        id        = node_feats,
+        label     = node_short,
+        direction = dplyr::coalesce(node_dirs, "none"),
+        padj      = node_padj,
+        class     = node_class,
+        size      = node_size,
+        stringsAsFactors = FALSE
+      ),
+      edges = data.frame(
+        from  = edge_list$from,
+        to    = edge_list$to,
+        r     = edge_list$r,
+        abs_r = edge_list$abs_r,
+        stringsAsFactors = FALSE
+      ),
+      group = grp
+    ))
+    net_captured_positions(NULL)  # new node set — stale positions no longer apply
+    
     # ── Render visNetwork ─────────────────────────────────────────────────────
     output$net_plot <- visNetwork::renderVisNetwork({
       visNetwork::visNetwork(nodes, vis_edges,
@@ -9735,6 +9841,17 @@ server <- function(input, output, session) {
             stringsAsFactors = FALSE
           ),
           useGroups = FALSE
+        ) %>%
+        # Client-side "screenshot" export of the widget exactly as currently
+        # arranged (incl. any manual node dragging). PNG only, resolution
+        # tied to the browser viewport — for true vector/DPI-controlled
+        # export, a separate static ggraph-based rendering would be needed.
+        visNetwork::visExport(
+          type    = "png",
+          name    = paste0("lipid_network_", grp, "_", Sys.Date()),
+          label   = "Export network image (PNG)",
+          background = "white",
+          style   = "background-color:#6c757d; color:#fff; border:none; padding:6px 12px; border-radius:4px;"
         )
     })
     
@@ -9756,6 +9873,122 @@ server <- function(input, output, session) {
     filename = function() paste0("lipid_network_edges_", Sys.Date(), ".csv"),
     content  = function(file) readr::write_csv(net_edge_data(), file)
   )
+  
+  output$net_layout_status_ui <- renderUI({
+    dat <- net_static_data()
+    pos <- net_captured_positions()
+    matched <- !is.null(dat) && !is.null(pos) && all(dat$nodes$id %in% pos$id)
+    if (matched) {
+      helpText(tags$small(style = "color:#1D9E75;",
+                          icon("check-circle"), " Export will match the current on-screen layout."))
+    } else {
+      helpText(tags$small(style = "color:#888;",
+                          "Export uses its own auto layout (not yet matched to on-screen)."))
+    }
+  })
+  
+  
+  # ── Static publication-quality network rendering (ggraph) ──────────────────
+  # Uses the exact on-screen node positions when "Match on-screen layout" has
+  # been clicked and they match the current node set; otherwise falls back to
+  # an auto force-directed layout, which will NOT match the interactive
+  # view's node placement (different algorithm to vis.js's physics engine).
+  net_plot_static <- reactive({
+    dat <- net_static_data()
+    validate(need(!is.null(dat), "Build a network first (click 'Build network')."))
+    for (pkg in c("igraph", "tidygraph", "ggraph")) {
+      if (!requireNamespace(pkg, quietly = TRUE)) {
+        validate(need(FALSE, sprintf("Package '%s' is required for the static network export.", pkg)))
+      }
+    }
+    
+    node_df <- dat$nodes
+    
+    # Match captured on-screen positions to the current node set, if present
+    pos <- net_captured_positions()
+    use_manual <- !is.null(pos) && all(node_df$id %in% pos$id)
+    if (use_manual) {
+      pos <- pos[match(node_df$id, pos$id), ]
+      node_df$x_pos <-  pos$x
+      node_df$y_pos <- -pos$y  # vis.js y increases downward; ggplot's increases upward
+    }
+    
+    g <- igraph::graph_from_data_frame(
+      d        = dat$edges[, c("from", "to", "r", "abs_r")],
+      vertices = node_df,
+      directed = FALSE
+    )
+    
+    dir_labels <- c(up = paste0("Up in ", dat$group), down = paste0("Down in ", dat$group), none = "No direction")
+    
+    set.seed(42)
+    p <- if (use_manual) {
+      ggraph::ggraph(g, layout = "manual", x = x_pos, y = y_pos)
+    } else {
+      ggraph::ggraph(g, layout = "fr")
+    }
+    
+    p +
+      ggraph::geom_edge_link(
+        ggplot2::aes(edge_width = abs_r, edge_colour = r > 0),
+        alpha = 0.55
+      ) +
+      ggraph::scale_edge_width_continuous(range = c(0.3, 2.2), guide = "none") +
+      ggraph::scale_edge_colour_manual(
+        values = c(`TRUE` = "#1D9E75", `FALSE` = "#D85A30"),
+        labels = c(`TRUE` = "Positive corr.", `FALSE` = "Negative corr."),
+        name   = NULL
+      ) +
+      ggraph::geom_node_point(
+        ggplot2::aes(size = size, fill = direction),
+        shape = 21, colour = "grey25", stroke = 0.3
+      ) +
+      ggplot2::scale_fill_manual(values = c(up = "#D85A30", down = "#1D9E75", none = "#B4B2A9"),
+                                 labels = dir_labels, name = NULL) +
+      ggplot2::scale_size_continuous(range = c(2, 7), guide = "none") +
+      ggraph::geom_node_text(
+        ggplot2::aes(label = label), repel = TRUE, size = 3,
+        max.overlaps = 30, segment.size = 0.2
+      ) +
+      ggraph::theme_graph(base_family = "sans", base_size = 11) +
+      ggplot2::theme(legend.position = "bottom") +
+      ggplot2::labs(title = paste0("Correlation network \u2014 ", dat$group))
+  })
+  
+  .net_export_dims <- function() {
+    px_w  <- input$net_export_width  %||% 2400
+    px_h  <- input$net_export_height %||% 1800
+    dpi   <- input$net_export_dpi    %||% 300
+    scale <- input$net_export_scale  %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+  
+  output$download_net_png <- downloadHandler(
+    filename = function() paste0("lipid_network_", isolate(input$net_group), "_", Sys.Date(), ".png"),
+    content = function(file) {
+      dims <- isolate(.net_export_dims())
+      p    <- isolate(net_plot_static())
+      validate(need(!is.null(p), "No network to export. Build a network first."))
+      ggplot2::ggsave(file, plot = p,
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
+    }
+  )
+  
+  output$download_net_svg <- downloadHandler(
+    filename = function() paste0("lipid_network_", isolate(input$net_group), "_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.net_export_dims())
+      p    <- isolate(net_plot_static())
+      validate(need(!is.null(p), "No network to export. Build a network first."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
+    }
+  )
+  
   
   output$net_table <- DT::renderDT({
     req(net_edge_data())
