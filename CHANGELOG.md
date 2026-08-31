@@ -8,6 +8,15 @@
 
 ---
 
+## [0.6.2] — 2026-08-28
+
+### Fixed
+
+#### Synthesis Pathways score-statistics export didn't match the on-screen plot
+The score-statistics lollipop plot ("Higher in [group]") had two independent implementations — one for on-screen display, one for PNG/SVG export. The v0.6.0 Group Order fix was applied only to the on-screen copy, so the exported image fell back to ggplot's default alphabetical ordering for the group legend/colours while the screen showed the correct Group Order. Rather than patch both copies, they're now consolidated into one shared function (`.build_path_plot()`); `pathStatsPlot` calls it directly, so there is exactly one implementation to keep in sync going forward. The pathway heatmap's on-screen/export pair was left as separate implementations, since its export path uses `pheatmap(..., silent = TRUE)` for manual device control — consolidating risked breaking the on-screen render for no benefit, since heatmap column order is always clustering-determined in both versions and was never affected by this bug.
+
+---
+
 ## [0.6.1] — 2026-08-28
 
 ### Fixed

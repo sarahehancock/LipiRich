@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.6.1
+# LipiRich v0.6.2
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.6.1
+# Version:  0.6.2
 # Tested with: MS-DIAL 5.5.251021, R 4.6.1, Bioconductor 3.23
 # --------------------------
 
-APP_VERSION <- "0.6.1"
+APP_VERSION <- "0.6.2"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -8324,6 +8324,11 @@ server <- function(input, output, session) {
           sig         = .data[[p_col]] < alpha,
           score_fct   = forcats::fct_reorder(score, neg_log10_p)
         )
+      # Same Group Order releveling as the on-screen pathStatsPlot render —
+      # without this, the export falls back to alphabetical ggplot default
+      # and its legend/colour order can differ from what's on screen.
+      dir_lv <- get_active_group_order()(res$direction)
+      res$direction <- factor(res$direction, levels = dir_lv)
       ggplot2::ggplot(res, ggplot2::aes(
         x = neg_log10_p, y = score_fct, colour = direction, fill = direction
       )) +
@@ -8500,62 +8505,7 @@ server <- function(input, output, session) {
     res <- path_score_stats()
     validate(need(!is.null(res) && nrow(res) > 0,
                   "No score statistics yet. Check grouping in Group Preview tab."))
-    
-    alpha    <- input$path_alpha %||% 0.05
-    use_padj <- !identical(input$path_padj_method %||% "BH", "none")
-    p_col    <- if (use_padj) "p_adj" else "p"
-    x_label  <- if (use_padj) expression(-log[10](p[adj])) else expression(-log[10](p))
-    
-    res <- res %>%
-      dplyr::mutate(
-        neg_log10_p = -log10(pmax(.data[[p_col]], 1e-300)),
-        sig         = .data[[p_col]] < alpha,
-        score_fct   = forcats::fct_reorder(score, neg_log10_p)
-      )
-    
-    dir_lv <- get_active_group_order()(res$direction)
-    direction_colours <- setNames(
-      scales::hue_pal()(length(dir_lv)),
-      dir_lv
-    )
-    res$direction <- factor(res$direction, levels = dir_lv)
-    
-    ggplot2::ggplot(res, ggplot2::aes(
-      x     = neg_log10_p,
-      y     = score_fct,
-      colour = direction,
-      fill   = direction
-    )) +
-      ggplot2::geom_segment(
-        ggplot2::aes(x = 0, xend = neg_log10_p, yend = score_fct),
-        linewidth = 0.7, alpha = 0.5
-      ) +
-      ggplot2::geom_point(
-        ggplot2::aes(shape = sig),
-        size = 3.5
-      ) +
-      ggplot2::scale_shape_manual(
-        values = c("TRUE" = 19, "FALSE" = 1),
-        labels = c("TRUE" = paste0("p < ", alpha), "FALSE" = "NS"),
-        name   = "Significance"
-      ) +
-      ggplot2::geom_vline(
-        xintercept = -log10(alpha),
-        linetype   = "dashed",
-        colour     = "grey50"
-      ) +
-      ggplot2::labs(
-        x      = x_label,
-        y      = NULL,
-        colour = "Higher in",
-        fill   = "Higher in",
-        title  = "Pathway score group comparisons"
-      ) +
-      ggplot2::theme_minimal(base_size = 12) +
-      ggplot2::theme(
-        panel.grid.major.y = ggplot2::element_blank(),
-        legend.position    = "right"
-      )
+    .build_path_plot("scorestats", fsz = 12)
   })
   
   # Table: clean formatted results
