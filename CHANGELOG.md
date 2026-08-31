@@ -8,6 +8,15 @@
 
 ---
 
+## [0.6.1] — 2026-08-28
+
+### Fixed
+
+#### Synthesis Pathways stats plot crashed after the Group Order fix
+`path_score_stats()` (feeding the Synthesis Pathways stats plot, `pathStatsPlot`) called `nzchar(group)` to drop unassigned samples. Since v0.6.0 made `group` an ordered factor (to support Group Order), `nzchar()` — which only accepts plain character vectors — threw `'nzchar()' requires a character vector` and crashed the plot. Fixed by coercing to character just for that check (`nzchar(as.character(group))`), leaving the factor and its ordering intact everywhere else in the pipeline. Also hardened the ANOVA branch's `direction` value to be explicitly character (it was inheriting factor-ness from a `group_by()`/`summarise()` result, while the t-test branch's `direction` was plain character — mixing the two across rows in `bind_rows()` is fragile depending on dplyr version). Audited every other consumer of `path_scores_long()`'s group column (heatmap pivot, table display, CSV download); none assume character type, so no other regressions from the same cause.
+
+---
+
 ## [0.6.0] — 2026-08-28
 
 ### Added

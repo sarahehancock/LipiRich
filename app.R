@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.6.0
+# LipiRich v0.6.1
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.6.0
+# Version:  0.6.1
 # Tested with: MS-DIAL 5.5.251021, R 4.6.1, Bioconductor 3.23
 # --------------------------
 
-APP_VERSION <- "0.6.0"
+APP_VERSION <- "0.6.1"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -8405,7 +8405,7 @@ server <- function(input, output, session) {
     if (!is.null(sel) && length(sel) > 0) sc <- sc %>% dplyr::filter(score %in% sel)
     
     # Drop samples with no group assignment
-    sc <- sc %>% dplyr::filter(!is.na(group) & nzchar(group) & group != "Unassigned")
+    sc <- sc %>% dplyr::filter(!is.na(group) & nzchar(as.character(group)) & as.character(group) != "Unassigned")
     
     grps <- unique(sc$group)
     if (length(grps) < 2) {
@@ -8472,7 +8472,7 @@ server <- function(input, output, session) {
         pval <- sm[["Pr(>F)"]][1]
         if (is.na(pval)) return(NULL)
         # Direction = group with highest mean
-        top_grp <- means$group[which.max(means$mean)]
+        top_grp <- as.character(means$group[which.max(means$mean)])
         data.frame(
           score      = s,
           test       = "one-way ANOVA",
