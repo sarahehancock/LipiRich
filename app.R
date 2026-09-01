@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.6.2
+# LipiRich v0.7.0
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.6.2
+# Version:  0.7.0
 # Tested with: MS-DIAL 5.5.251021, R 4.6.1, Bioconductor 3.23
 # --------------------------
 
-APP_VERSION <- "0.6.2"
+APP_VERSION <- "0.7.0"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -991,25 +991,30 @@ ui <- fluidPage(
                      wellPanel(
                        checkboxInput("exclude_blank_is", "Exclude samples named 'Blank'", value = FALSE),
                        selectInput("is_class", "Lipid Class", choices = "Loading..."),
-                       selectInput(
-                         "grouping_method_is",
-                         "How to group samples:",
-                         choices = c("By sample", "Delimiter-based", "Regex capture group"),
-                         selected = "By sample"
-                       ),
-                       conditionalPanel(
-                         condition = "input.grouping_method_is == 'Delimiter-based'",
-                         selectInput(
-                           "group_delim_is", "Delimiter",
-                           choices = c("_" = "_", "-" = "-", "space" = " ", "." = ".", "/" = "/"),
-                           selected = "_"
+                       tags$hr(),
+                       radioButtons(
+                         "is_grouping_mode",
+                         "How to display samples:",
+                         choices = c(
+                           "Individual samples" = "individual",
+                           "Grouped (from Group Preview)" = "grouped"
                          ),
-                         numericInput("group_tokens_is", "Use first N tokens as group", value = 1, min = 1, max = 5, step = 1)
+                         selected = "individual"
                        ),
                        conditionalPanel(
-                         condition = "input.grouping_method_is == 'Regex capture group'",
-                         textInput("group_regex_is", "Regex with ONE capture group", value = "^([^_]+)")
+                         condition = "input.is_grouping_mode == 'grouped'",
+                         div(
+                           style = "background:#f0f4fa; border-radius:6px; padding:10px 12px; margin-bottom:10px;",
+                           tags$strong(tags$small("Group selection")),
+                           helpText(tags$small(
+                             "Groups (and their plotting order) are defined in the ",
+                             tags$strong("Group Preview"), " tab.",
+                             "If a grouping CSV is uploaded and enabled, it overrides token-based grouping."
+                           )),
+                           uiOutput("is_group_token_ui")
+                         )
                        ),
+                       tags$hr(),
                        radioButtons(
                          "is_mode",
                          "Ion mode to display",
@@ -1024,6 +1029,17 @@ ui <- fluidPage(
                        selectInput(
                          "error_type_is", "Error bars",
                          choices = c("SEM", "SD", "95% CI"), selected = "SEM"
+                       ),
+                       tags$hr(),
+                       h5("Export plot"),
+                       numericInput("is_export_width",    "Width (px)",     1200, 400, 4000, 50),
+                       numericInput("is_export_height",   "Height (px)",     700, 300, 4000, 50),
+                       numericInput("is_export_dpi",      "DPI",             300,  72,  600, 12),
+                       numericInput("is_export_scale",    "Scale fraction", 1.00, 0.25, 2.00, 0.05),
+                       numericInput("is_export_fontsize", "Base font size",   12,    6,   24,  1),
+                       fluidRow(
+                         column(6, downloadButton("download_is_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_is_svg", "SVG"))
                        )
                      )
                    ),
@@ -1221,6 +1237,17 @@ ui <- fluidPage(
                        selectInput(
                          "error_type_met", "Error bars",
                          choices = c("SEM", "SD", "95% CI"), selected = "SEM"
+                       ),
+                       tags$hr(),
+                       h5("Export plot"),
+                       numericInput("met_export_width",    "Width (px)",     1200, 400, 4000, 50),
+                       numericInput("met_export_height",   "Height (px)",     700, 300, 4000, 50),
+                       numericInput("met_export_dpi",      "DPI",             300,  72,  600, 12),
+                       numericInput("met_export_scale",    "Scale fraction", 1.00, 0.25, 2.00, 0.05),
+                       numericInput("met_export_fontsize", "Base font size",   12,    6,   24,  1),
+                       fluidRow(
+                         column(6, downloadButton("download_met_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_met_svg", "SVG"))
                        )
                      )
                    ),
@@ -1285,6 +1312,17 @@ ui <- fluidPage(
                        selectInput(
                          "error_type_all", "Error bars",
                          choices = c("SEM", "SD", "95% CI"), selected = "SEM"
+                       ),
+                       tags$hr(),
+                       h5("Export plot"),
+                       numericInput("class_all_export_width",    "Width (px)",     1200, 400, 4000, 50),
+                       numericInput("class_all_export_height",   "Height (px)",     900, 300, 6000, 50),
+                       numericInput("class_all_export_dpi",      "DPI",             300,  72,  600, 12),
+                       numericInput("class_all_export_scale",    "Scale fraction", 1.00, 0.25, 2.00, 0.05),
+                       numericInput("class_all_export_fontsize", "Base font size",   12,    6,   24,  1),
+                       fluidRow(
+                         column(6, downloadButton("download_class_all_png", "PNG", class = "btn-primary")),
+                         column(6, downloadButton("download_class_all_svg", "SVG"))
                        )
                      )
                    ),
@@ -2507,6 +2545,7 @@ server <- function(input, output, session) {
   output$stats_group_token_ui <- renderUI({ .token_mirror_ui() })
   output$path_group_token_ui  <- renderUI({ .token_mirror_ui() })
   output$net_group_token_ui   <- renderUI({ .token_mirror_ui() })
+  output$is_group_token_ui    <- renderUI({ .token_mirror_ui() })
   
   # ── Central grouping reactive — single source of truth ───────────────────────
   # Returns a named list: list(group = vector, factorA = vector, factorB = vector)
@@ -4324,16 +4363,30 @@ server <- function(input, output, session) {
     validate(need(nrow(df) > 0, "No IS values available for the selected class."))
     
     
-    df <- df %>%
-      dplyr::mutate(group = resolve_group_labels(
-        samples = sample, method = input$grouping_method_is,
-        delim = input$group_delim_is, tokens = input$group_tokens_is,
-        regex = input$group_regex_is, group_csv_input = input$group_csv,
-        use_csv_flag = input$use_group_csv,
-        group_map = if (!is.null(input$group_csv) && isTRUE(input$use_group_csv))
-          group_map() else NULL
-      ))
-    
+    # Always resolve each sample's central (Group Preview) group, even in
+    # "Individual samples" mode — this is what lets individual samples be
+    # clustered/ordered by Group Order below, without changing what's actually
+    # displayed on the x-axis (each sample keeps its own bar).
+    fn           <- get_active_grouping()
+    res          <- fn(df$sample)
+    df$central_group <- res$group
+
+    # Assign the DISPLAYED group labels. "Individual samples" keeps every
+    # sample as its own x-axis category (the tab's original default — useful
+    # for QC, spotting a single bad injection, etc.). "Grouped" displays the
+    # central group itself, matching every other analysis tab, so Group Order
+    # applies directly. (IS Plots previously resolved its own group labels
+    # independently via input$grouping_method_is / group_delim_is /
+    # group_tokens_is / group_regex_is, which is why Group Order never had any
+    # visible effect when grouped: the order list is built from the central
+    # grouping's group names, so those locally-resolved labels almost never
+    # matched it.)
+    if (identical(input$is_grouping_mode %||% "individual", "individual")) {
+      df <- df %>% dplyr::mutate(group = sample)
+    } else {
+      df <- df %>% dplyr::mutate(group = central_group)
+    }
+
     mode_sel <- input$is_mode
     if (mode_sel == "neg") {
       df <- df %>% dplyr::filter(ion.mode == "negative")
@@ -4357,6 +4410,7 @@ server <- function(input, output, session) {
       df_sum <- df %>%
         dplyr::group_by(group, ion.mode) %>%
         dplyr::summarise(
+          central_group = dplyr::first(central_group),
           mean = mean(IS_value, na.rm = TRUE),
           sd   = sd(IS_value, na.rm = TRUE),
           n    = dplyr::n(),
@@ -4368,6 +4422,7 @@ server <- function(input, output, session) {
       df_sum <- df %>%
         dplyr::group_by(group) %>%
         dplyr::summarise(
+          central_group = dplyr::first(central_group),
           mean = mean(IS_value, na.rm = TRUE),
           sd   = sd(IS_value, na.rm = TRUE),
           n    = dplyr::n(),
@@ -4376,7 +4431,7 @@ server <- function(input, output, session) {
           .groups = "drop"
         )
     }
-    
+
     list(points = df, summary = df_sum, mode = mode_sel)
   })
   
@@ -5334,13 +5389,40 @@ server <- function(input, output, session) {
     datatable(is_table_reactive(), options = list(scrollX = TRUE), rownames = FALSE)
   })
   
-  output$isPlot <- renderPlotly({
+  # Work out the x-axis category order for the IS plot / summary table.
+  # - "Grouped" mode: group == the central Group Preview group, so Group Order
+  #   (CSV order column -> manual drag order -> default first-appearance
+  #   order) applies directly to df_sum$group.
+  # - "Individual samples" mode: group == each sample's own ID, which Group
+  #   Order says nothing about directly. Instead, cluster the sample IDs by
+  #   their central_group's rank in Group Order (primary key), then
+  #   alphabetically by sample name within each group (secondary key) — e.g.
+  #   Group Order lard -> fishoil -> chow shows all lard_* bars, then all
+  #   fishoil_* bars, then all chow_* bars.
+  .is_group_levels <- function(df_sum) {
+    if (!identical(input$is_grouping_mode %||% "individual", "individual")) {
+      get_active_group_order()(df_sum$group)
+    } else {
+      grp_rank_lv <- get_active_group_order()(df_sum$central_group)
+      lookup <- df_sum %>%
+        dplyr::distinct(group, central_group) %>%
+        dplyr::mutate(central_group = factor(central_group, levels = grp_rank_lv)) %>%
+        dplyr::arrange(central_group, group)
+      as.character(lookup$group)
+    }
+  }
+
+  .build_is_plot <- function(fsz = 12) {
     req(is_plot_data())
     pd       <- is_plot_data()
     df_pts   <- pd$points
     df_sum   <- pd$summary
     mode_sel <- pd$mode
-    
+
+    grp_lv <- .is_group_levels(df_sum)
+    df_sum$group <- factor(df_sum$group, levels = grp_lv)
+    df_pts$group <- factor(df_pts$group, levels = grp_lv)
+
     err_vec <- switch(input$error_type_is,
                       "SEM"    = df_sum$sem,
                       "SD"     = df_sum$sd,
@@ -5348,7 +5430,7 @@ server <- function(input, output, session) {
                       df_sum$sem)
     df_sum$ymin <- df_sum$mean - err_vec
     df_sum$ymax <- df_sum$mean + err_vec
-    
+
     if (mode_sel == "both") {
       p <- ggplot() +
         geom_col(data = df_sum,
@@ -5369,7 +5451,7 @@ server <- function(input, output, session) {
                    alpha = 0.7, size = 2) +
         labs(title = paste0("IS Values (Class: ", input$is_class, ") — Both ion modes"),
              x = "Group", y = "IS Value") +
-        theme_minimal(base_size = 12) +
+        theme_minimal(base_size = fsz) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1),
               panel.grid.minor = element_blank())
     } else {
@@ -5393,39 +5475,97 @@ server <- function(input, output, session) {
                                    "neg"  = "Negative only",
                                    "pos"  = "Positive only")),
              x = "Group", y = "IS Value") +
-        theme_minimal(base_size = 12) +
+        theme_minimal(base_size = fsz) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1),
               panel.grid.minor = element_blank())
     }
-    
+
+    p
+  }
+
+  output$isPlot <- renderPlotly({
+    fsz <- input$is_export_fontsize %||% 12
+    p   <- .build_is_plot(fsz)
+
     ggplotly(p, tooltip = "text") %>%
       plotly::layout(
         legend = list(orientation = "v"),
         margin = list(b = 80)
       )
   })
-  
-  
-  output$metPlot <- renderPlotly({
+
+  .is_export_dims <- function() {
+    px_w  <- input$is_export_width  %||% 1200
+    px_h  <- input$is_export_height %||% 700
+    dpi   <- input$is_export_dpi    %||% 300
+    scale <- input$is_export_scale  %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+
+  output$download_is_png <- downloadHandler(
+    filename = function() paste0("is_plot_", isolate(input$is_class), "_", Sys.Date(), ".png"),
+    content = function(file) {
+      dims <- isolate(.is_export_dims())
+      fsz  <- isolate(input$is_export_fontsize %||% 12)
+      p    <- isolate(.build_is_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      ggplot2::ggsave(file, plot = p,
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
+    }
+  )
+
+  output$download_is_svg <- downloadHandler(
+    filename = function() paste0("is_plot_", isolate(input$is_class), "_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.is_export_dims())
+      fsz  <- isolate(input$is_export_fontsize %||% 12)
+      p    <- isolate(.build_is_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
+    }
+  )
+
+  # This output was declared in the UI (DTOutput("isPlotSummary")) but never had
+  # a matching render defined server-side, so the "Summary table (group-level IS
+  # statistics)" box beneath the IS plot has always been blank. Also apply Group
+  # Order here so the table's row order matches the plot above it.
+  output$isPlotSummary <- renderDT({
+    req(is_plot_data())
+    df_sum <- is_plot_data()$summary
+    grp_lv <- .is_group_levels(df_sum)
+    df_sum <- df_sum %>% dplyr::mutate(group = factor(group, levels = grp_lv))
+    df_sum <- df_sum %>%
+      dplyr::arrange(group, dplyr::across(dplyr::any_of("ion.mode"))) %>%
+      dplyr::mutate(across(where(is.numeric), ~round(., 4)))
+    datatable(df_sum, options = list(scrollX = TRUE), rownames = FALSE)
+  })
+
+
+  .build_met_plot <- function(fsz = 12) {
     req(met_plot_data())
     pd <- met_plot_data()
     df_pts <- pd$points
     df_sum <- pd$summary
-    
+
     # Ensure group is a factor, ordered by the central group plotting order
     grp_lv <- get_active_group_order()(df_pts$group)
     df_sum$group <- factor(df_sum$group, levels = grp_lv)
     df_pts$group <- factor(df_pts$group, levels = levels(df_sum$group))
     group_levels <- levels(df_sum$group)
-    
+
     # Numeric conversion
     df_sum$group_num <- as.numeric(df_sum$group)
     df_pts$group_num <- as.numeric(df_pts$group)
-    
+
     # Remove NA rows
     df_sum <- df_sum[!is.na(df_sum$group_num) & is.finite(df_sum$mean), ]
     df_pts <- df_pts[!is.na(df_pts$group_num) & is.finite(df_pts$value), ]
-    
+
     # Error bars
     err_vec <- switch(input$error_type_met,
                       "SEM" = df_sum$sem,
@@ -5437,7 +5577,7 @@ server <- function(input, output, session) {
     err_vec[!is.finite(err_vec)] <- 0
     ymin <- df_sum$mean - err_vec
     ymax <- df_sum$mean + err_vec
-    
+
     # Hover text
     bar_hover_text <- switch(input$error_type_met,
                              "SEM" = paste0("Mean: ", signif(df_sum$mean, 5), "\nSEM: ", signif(df_sum$sem, 5)),
@@ -5447,8 +5587,7 @@ server <- function(input, output, session) {
     )
     df_pts$val_fmt <- signif(df_pts$value, 5)
     pt_hover_text <- paste0("Sample: ", as.character(df_pts$sample), "\nValue: ", df_pts$val_fmt)
-    
-    # Try ggplotly first
+
     p <- ggplot() +
       geom_col(data = df_sum, aes(x = group, y = mean, text = bar_hover_text), fill = "#54A24B", width = 0.7) +
       geom_errorbar(data = transform(df_sum, ymin = ymin, ymax = ymax), aes(x = group, ymin = ymin, ymax = ymax), width = 0.2, colour = "#333") +
@@ -5458,9 +5597,33 @@ server <- function(input, output, session) {
         x = "Group",
         y = pd$ylab
       ) +
-      theme_minimal(base_size = 12) +
+      theme_minimal(base_size = fsz) +
       theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1), panel.grid.minor = element_blank())
-    
+
+    attr(p, "group_levels") <- group_levels
+    attr(p, "df_sum") <- df_sum
+    attr(p, "df_pts") <- df_pts
+    attr(p, "ymin") <- ymin
+    attr(p, "ymax") <- ymax
+    attr(p, "bar_hover_text") <- bar_hover_text
+    attr(p, "pt_hover_text") <- pt_hover_text
+    attr(p, "ylab") <- pd$ylab
+    p
+  }
+
+  output$metPlot <- renderPlotly({
+    fsz <- input$met_export_fontsize %||% 12
+    p <- .build_met_plot(fsz)
+    group_levels   <- attr(p, "group_levels")
+    df_sum         <- attr(p, "df_sum")
+    df_pts         <- attr(p, "df_pts")
+    ymin           <- attr(p, "ymin")
+    ymax           <- attr(p, "ymax")
+    bar_hover_text <- attr(p, "bar_hover_text")
+    pt_hover_text  <- attr(p, "pt_hover_text")
+    ylab           <- attr(p, "ylab")
+
+    # Try ggplotly first
     tryCatch({
       ggplotly(p, tooltip = "text") %>%
         layout(showlegend = FALSE)
@@ -5534,7 +5697,7 @@ server <- function(input, output, session) {
               tickvals = seq_along(group_levels),
               ticktext = group_levels
             ),
-            yaxis = list(title = pd$ylab),
+            yaxis = list(title = ylab),
             barmode = "overlay",
             showlegend = FALSE
           )
@@ -5543,7 +5706,7 @@ server <- function(input, output, session) {
           layout(
             title = paste0("Metabolite: ", input$met_name, " (Class: ", input$met_class, ")"),
             xaxis = list(title = "Group"),
-            yaxis = list(title = pd$ylab),
+            yaxis = list(title = ylab),
             barmode = "overlay",
             showlegend = FALSE
           )
@@ -5551,6 +5714,42 @@ server <- function(input, output, session) {
       plt
     })
   })
+
+  .met_export_dims <- function() {
+    px_w  <- input$met_export_width  %||% 1200
+    px_h  <- input$met_export_height %||% 700
+    dpi   <- input$met_export_dpi    %||% 300
+    scale <- input$met_export_scale  %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+
+  output$download_met_png <- downloadHandler(
+    filename = function() paste0("metabolite_plot_", isolate(input$met_name), "_", Sys.Date(), ".png"),
+    content = function(file) {
+      dims <- isolate(.met_export_dims())
+      fsz  <- isolate(input$met_export_fontsize %||% 12)
+      p    <- isolate(.build_met_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      ggplot2::ggsave(file, plot = p,
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
+    }
+  )
+
+  output$download_met_svg <- downloadHandler(
+    filename = function() paste0("metabolite_plot_", isolate(input$met_name), "_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.met_export_dims())
+      fsz  <- isolate(input$met_export_fontsize %||% 12)
+      p    <- isolate(.build_met_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
+    }
+  )
   
   
   output$metPlotSummary <- renderDT({
@@ -5559,12 +5758,12 @@ server <- function(input, output, session) {
     datatable(df, options = list(scrollX = TRUE), rownames = FALSE)
   })
   
-  output$classAllPlot <- renderPlotly({
+  .build_class_all_plot <- function(fsz = 12) {
     req(class_all_plot_data())
     pd     <- class_all_plot_data()
     df_pts <- pd$points
     df_sum <- pd$summary
-    
+
     # --- Error vector and whiskers (unchanged)
     err_vec <- switch(input$error_type_all,
                       "SEM"    = df_sum$sem,
@@ -5573,7 +5772,7 @@ server <- function(input, output, session) {
                       df_sum$sem)
     ymin <- df_sum$mean - err_vec
     ymax <- df_sum$mean + err_vec
-    
+
     # --- Keep your ordering logic (already done in class_all_plot_data)
     # Factor the metabolite names for stable ordering in coord_flip
     df_sum <- df_sum %>%
@@ -5582,20 +5781,20 @@ server <- function(input, output, session) {
     df_pts <- df_pts %>%
       dplyr::mutate(`Metabolite name` = factor(`Metabolite name`,
                                                levels = levels(df_sum$`Metabolite name`)))
-    
+
     # --- Build hover text content
     # Format numbers for cleaner display
     df_sum$mean_fmt <- signif(df_sum$mean, 5)
     df_sum$sem_fmt  <- signif(df_sum$sem, 5)
     df_sum$sd_fmt   <- signif(df_sum$sd, 5)
     df_sum$ci_fmt   <- signif(df_sum$ci95, 5)
-    
+
     err_lab <- switch(input$error_type_all,
                       "SEM"    = "SEM",
                       "SD"     = "SD",
                       "95% CI" = "95% CI",
                       "SEM")
-    
+
     # Bar hover: show mean plus chosen error metric
     bar_hover_text <- switch(input$error_type_all,
                              "SEM"    = paste0("Mean: ", df_sum$mean_fmt, "\n", err_lab, ": ", df_sum$sem_fmt),
@@ -5603,13 +5802,13 @@ server <- function(input, output, session) {
                              "95% CI" = paste0("Mean: ", df_sum$mean_fmt, "\n", err_lab, ": ", df_sum$ci_fmt),
                              paste0("Mean: ", df_sum$mean_fmt, "\n", err_lab, ": ", df_sum$sem_fmt)
     )
-    
+
     # Points hover: sample name + metabolite name + value
     df_pts$val_fmt <- signif(df_pts$value, 5)
     pt_hover_text  <- paste0("Sample: ", as.character(df_pts$sample),
                              "\nMetabolite: ", as.character(df_pts$`Metabolite name`),
                              "\nValue: ", df_pts$val_fmt)
-    
+
     # --- Plot
     p <- ggplot() +
       # Bars with our mean-based hover text
@@ -5641,15 +5840,57 @@ server <- function(input, output, session) {
         x = "Metabolite",
         y = pd$ylab
       ) +
-      theme_minimal(base_size = 12) +
+      theme_minimal(base_size = fsz) +
       theme(panel.grid.minor = element_blank())
-    
-    plot_height <- max(400, length(unique(df_sum$`Metabolite name`)) * 30)
-    
+
+    attr(p, "n_features") <- length(unique(df_sum$`Metabolite name`))
+    p
+  }
+
+  output$classAllPlot <- renderPlotly({
+    fsz <- input$class_all_export_fontsize %||% 12
+    p <- .build_class_all_plot(fsz)
+    plot_height <- max(400, attr(p, "n_features") * 30)
     ggplotly(p, tooltip = "text", height = plot_height)
   })
-  
-  
+
+  .class_all_export_dims <- function() {
+    px_w  <- input$class_all_export_width  %||% 1200
+    px_h  <- input$class_all_export_height %||% 900
+    dpi   <- input$class_all_export_dpi    %||% 300
+    scale <- input$class_all_export_scale  %||% 1.0
+    list(w = (px_w / dpi) * scale,
+         h = (px_h / dpi) * scale,
+         dpi = dpi)
+  }
+
+  output$download_class_all_png <- downloadHandler(
+    filename = function() paste0("class_lipids_", isolate(input$class_all), "_", Sys.Date(), ".png"),
+    content = function(file) {
+      dims <- isolate(.class_all_export_dims())
+      fsz  <- isolate(input$class_all_export_fontsize %||% 12)
+      p    <- isolate(.build_class_all_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      ggplot2::ggsave(file, plot = p,
+                      width = dims$w, height = dims$h,
+                      dpi = dims$dpi, device = "png")
+    }
+  )
+
+  output$download_class_all_svg <- downloadHandler(
+    filename = function() paste0("class_lipids_", isolate(input$class_all), "_", Sys.Date(), ".svg"),
+    content = function(file) {
+      dims <- isolate(.class_all_export_dims())
+      fsz  <- isolate(input$class_all_export_fontsize %||% 12)
+      p    <- isolate(.build_class_all_plot(fsz))
+      validate(need(!is.null(p), "No plot to export."))
+      svglite::svglite(file, width = dims$w, height = dims$h)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      print(p)
+    }
+  )
+
+
   output$classAllSummary <- renderDT({
     req(class_all_plot_data())
     df <- class_all_plot_data()$summary %>% dplyr::mutate(across(where(is.numeric), ~round(., 4)))

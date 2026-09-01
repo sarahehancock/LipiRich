@@ -8,6 +8,31 @@
 
 ---
 
+## [0.7.0] — 2026-09-01
+
+### Added
+
+#### Plot download buttons on three tabs that were missing them
+The **IS Plots**, **Plot single lipid**, and **Plot lipids by class** tabs had no way to export their plots — only the interactive Plotly view, plus (for the latter two) a summary-table CSV download. All three now have the same **Export plot** panel (Width/Height/DPI/Scale fraction/Base font size numeric inputs with PNG and SVG buttons) used throughout the rest of the app. Each tab's plot-building code was factored out of its `renderPlotly` block into a standalone function (`.build_is_plot()`, `.build_met_plot()`, `.build_class_all_plot()`) shared by the on-screen render and both new download handlers, so the exported image always matches what's on screen — the same shared-function pattern already used for PCA, Volcano Plot, Class Bar Plots, and the other export-enabled tabs (and the same divergence bug that pattern was adopted to prevent, per the v0.6.2 fix below). Every other tab with a plot — Outlier Detection, PCA, Statistics, Volcano Plot, Class Bar Plots, Heatmap, Enrichment, Correlation Network, and Synthesis Pathways — already had PNG/SVG export and is unaffected.
+
+### Fixed
+
+#### IS Plots didn't follow Group Order — and lost its "individual samples" view along the way
+IS Plots had its own independent, older grouping mechanism — a "How to group samples" control (`grouping_method_is`: By sample / Delimiter-based / Regex capture group, with its own delimiter/token/regex inputs) that resolved group labels completely separately from every other tab, via `resolve_group_labels()`. Since the app's Group Order feature is defined in terms of the *central* grouping reactive's group names (`.current_group_choices()`, which calls `get_active_grouping()`, driven by the Group Preview tab), IS Plots' independently-resolved group labels almost never matched an entry in that list, so `get_active_group_order()` had nothing to reorder and the plot silently fell back to alphabetical order regardless of a CSV `order` column or the Group Preview drag list.
+
+Fixed by rewiring `is_plot_data()` to assign `group` via `get_active_grouping()`, the same central reactive used by `met_plot_data()`, `class_all_plot_data()`, PCA, Statistics, and every other tab — the same "dead parallel grouping UI" pattern documented as fixed for Synthesis Pathways in v0.0.2/v0.5.0, which IS Plots had never been migrated onto.
+
+That rewire initially removed the tab's original "By sample" option entirely — every IS plot became a grouped (e.g. chow/fishoil/lard) view with no way back to one bar per sample. That behaviour (each individual sample as its own x-axis category, useful for QC — e.g. spotting a single bad injection) was legitimate functionality, not part of the disconnected-grouping bug; it had just been entangled with the same code. Restored as an explicit **"How to display samples"** choice on the IS Plots tab: **Individual samples** (the default, matching the tab's original behaviour) or **Grouped (from Group Preview)**. `is_plot_data()` sets `group` to the raw sample name in individual mode, or resolves it via `get_active_grouping()` in grouped mode. Group Order (in `.build_is_plot()` and the `isPlotSummary` table below) is applied only in grouped mode, since it has no group names to act on when every row is its own sample. The Group Preview group-selection note/mirror is shown only while grouped mode is selected.
+
+Regression-tested against this project's demo dataset with `shiny::testServer()`, exercising the real reactive pipeline rather than reasoning from the code alone: the final `ggplotly()` widget's `layout.xaxis.categoryorder`/`categoryarray` (what plotly.js actually uses to decide bar order at render time) was confirmed to match the intended order under both a manually reordered Group Preview drag list and a grouping CSV's `order` column; individual mode correctly lists every sample (`chow_1`, `chow_13`, …) as its own category; and switching between individual and grouped mode reverts cleanly in both directions.
+
+Individual mode initially left sample order plain alphabetical, since Group Order is defined over group names and individual mode's x-axis categories are sample IDs, not group names. `is_plot_data()` now also resolves and carries each sample's central Group Preview group as `central_group` (on both the points-level data and the per-sample summary), even in individual mode, purely for ordering purposes — the x-axis still shows one bar per sample either way. `.build_is_plot()` and `isPlotSummary` share a new `.is_group_levels()` helper: in grouped mode it applies Group Order to the group names directly as before; in individual mode it ranks each sample by its `central_group`'s position in Group Order (primary key) and alphabetically by sample name within a group (secondary key), so setting Group Order to lard → fishoil → chow clusters all `lard_*` bars together, then all `fishoil_*` bars, then all `chow_*` bars, instead of interleaving them alphabetically. Verified with `shiny::testServer()`: after setting a manual lard → fishoil → chow order, individual-mode plot and summary-table category order both group into exactly that sequence (with any sample group absent from the order list, e.g. `blank`, appended afterwards — the same "unseen groups" fallback `get_active_group_order()` already used), samples within each group remain alphabetically ordered, every sample still appears as its own bar (not collapsed), and grouped mode's own ordering is unaffected.
+
+#### IS Plots summary table was completely blank
+`DTOutput("isPlotSummary")` (the "Summary table (group-level IS statistics)" box under the IS plot) has been in the UI since IS Plots was first built, but no matching `output$isPlotSummary` render was ever defined server-side — a dangling output, same class of bug as the `sigHeatmapInfo` case fixed in v0.0.3. The box has always rendered empty regardless of data or settings. Added the missing render, sourced from the same `is_plot_data()$summary` used by the plot, with Group Order applied to its row order (in grouped mode) so the table and the plot above it agree.
+
+---
+
 ## [0.6.2] — 2026-08-28
 
 ### Fixed
@@ -172,7 +197,7 @@ The internal `is_iqc_sample()` helper matched `iqc`, `qc`, `istd`, and `itsd` al
 `factoextra::fviz_pca_ind()` requires the `habillage` grouping factor to be sized to active individuals only; supplementary individuals must be styled separately. The PCA plot no longer uses `fviz_pca_ind()` — it is built directly from `pca_result()$ind$coord` and `pca_result()$ind.sup$coord`, which also removes an unexplained extra point that had been appearing on the plot (traced to the iQC/ISTD conflation above).
 
 #### Backtick-quoted column name with a `\u` unicode escape
-A column name written as `` `T\u00b2 score` `` failed to parse — R does not support `\u` unicode escapes inside backtick-quoted names, only inside string literals. Replaced with the literal `²` character.
+A column name written as `` `T² score` `` failed to parse — R does not support `\u` unicode escapes inside backtick-quoted names, only inside string literals. Replaced with the literal `²` character.
 
 ### Improvements
 
