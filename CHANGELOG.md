@@ -8,6 +8,17 @@
 
 ---
 
+## [0.9.0] — 2026-09-12
+
+### Changed
+
+#### "ISTD" renamed to "IS" throughout the app and README
+Every user-facing label, help/validation/warning message, and the PCA plot's legend (labels, colours, caption) now say "IS" instead of "ISTD," matching the terminology already used for the `[IS]` metabolite-name tag. Internal-only identifiers (input IDs, output IDs, the internal-standard CSV's own dataframe column) are unchanged, since users never see these. The internal-standard amount/units CSV now accepts either an `IS` or `ISTD` column header, so existing CSV files (including `Demo data_IS_amounts.csv`, itself renamed from `Demo data ISTD_amounts.csv`) keep working without modification.
+
+While tracing the rename, found that the MS-DIAL processing tutorial instructs users to name internal-standard-only injections `IS_pos`, but the sample-detection function only matched an `istd`/`itsd` substring — a sample named exactly per the tutorial's own instructions wouldn't have been recognised as IS-only. Extended `is_istd_sample()` (and the separate group-label exclusion regex) to also match a delimiter-bounded `IS` token (`IS_pos`, `IS_1`, bare `IS`), alongside the existing `ISTD`/`ITSD` patterns. Tested against the demo dataset's real sample names plus deliberately adversarial ones (`Fish_1_pos`, `Island_5`, `This_sample`) to confirm no false positives.
+
+---
+
 ## [0.8.0] — 2026-09-12
 
 ### Added

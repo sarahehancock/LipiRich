@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.8.0
+# LipiRich v0.9.0
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.8.0
+# Version:  0.9.0
 # Tested with: MS-DIAL 5.5.251021, R 4.6.1, Bioconductor 3.23
 # --------------------------
 
-APP_VERSION <- "0.8.0"
+APP_VERSION <- "0.9.0"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -256,21 +256,26 @@ idle_timeout_js <- tags$script(HTML("
 "))
 
 
-# --- iQC / QC / ISTD sample tag helpers ---
-# iQC and ISTD are NOT the same thing: iQC is a pooled biological QC sample
+# --- iQC / QC / IS sample tag helpers ---
+# iQC and IS are NOT the same thing: iQC is a pooled biological QC sample
 # (real matrix, monitors extraction/injection reproducibility); a sample
-# literally named ISTD/ITSD is typically an internal-standard-only injection
+# literally named IS/ISTD/ITSD is typically an internal-standard-only injection
 # with no biological matrix, and has a wildly different lipid profile. They
 # are kept as separate checks so callers that need to tell them apart (e.g.
 # PCA) can, while callers that just want "not a real biological sample"
 # (is_qc_type_sample / filter_iqc / is_protected_sample) still catch both.
 is_iqc_sample <- function(x) {
-  # Matches iQC or standalone QC only — NOT ISTD/ITSD
+  # Matches iQC or standalone QC only — NOT IS/ISTD/ITSD
   grepl("iqc|\\bqc\\b", x, ignore.case = TRUE, perl = TRUE)
 }
 is_istd_sample <- function(x) {
-  # Matches ISTD/ITSD only — a whole sample injection, not the "[IS]" metabolite tag
-  grepl("istd|itsd", x, ignore.case = TRUE, perl = TRUE)
+  # Matches a whole sample injection named IS/ISTD/ITSD — not the "[IS]"
+  # metabolite tag. "istd"/"itsd" are matched as a substring (specific enough
+  # on their own); bare "IS" is matched only when delimited by an underscore
+  # or the start/end of the name (e.g. "IS_pos", "IS_1", "sample_IS"), since
+  # an unbounded "is" substring would false-match ordinary sample names like
+  # "Fish_1_pos" or "Island_5".
+  grepl("istd|itsd|(^|_)is(_|$)", x, ignore.case = TRUE, perl = TRUE)
 }
 is_qc_type_sample <- function(x) {
   is_iqc_sample(x) | is_istd_sample(x)
@@ -283,7 +288,7 @@ filter_iqc <- function(df, include_iqc = FALSE, sample_col = "sample") {
 }
 
 # Samples that should never be treated as biological samples for outlier
-# detection/exclusion or protein-match checking: ISTD, iQC/QC, and Blank
+# detection/exclusion or protein-match checking: IS, iQC/QC, and Blank
 # (flexible match: "Blank", "Blank_1", "Blank-2", etc.)
 is_protected_sample <- function(x) {
   x  <- as.character(x)
@@ -457,7 +462,7 @@ landing_page_ui <- function() {
           tags$h2("From alignment file to enrichment, in one session"),
           div(class = "lr-grid",
               div(class = "lr-card", div(class = "lr-step", "Step 1"), tags$h3("Import & cleaning"), tags$p("Upload 1\u20132 MS-DIAL .txt files. Data are reshaped, ion modes resolved (including cross-mode identity transfer), and duplicate features deduplicated.")),
-              div(class = "lr-card", div(class = "lr-step", "Step 2"), tags$h3("Internal standards"), tags$p("QC standard signal by class, shown in both ion modes by default; hover any point for the exact standard name. Per-ISTD amount and units via CSV.")),
+              div(class = "lr-card", div(class = "lr-step", "Step 2"), tags$h3("Internal standards"), tags$p("QC standard signal by class, shown in both ion modes by default; hover any point for the exact standard name. Per-IS amount and units via CSV.")),
               div(class = "lr-card", div(class = "lr-step", "Step 3"), tags$h3("Normalisation"), tags$p("Blank background subtraction, IS-based quantitative normalisation, and optional unit-aware protein normalisation.")),
               div(class = "lr-card", div(class = "lr-step", "Step 4\u20135"), tags$h3("Visualisation"), tags$p("Interactive bar plots for a single species or every species in a class, with cascading ion-mode, adduct, and name filters and flexible grouping.")),
               div(class = "lr-card", div(class = "lr-step", "Step 6"), tags$h3("Export"), tags$p("Download wide or long CSV, filtered by class and value type (absolute or % of class total).")),
@@ -556,29 +561,29 @@ ui <- fluidPage(
       textOutput("loadedFiles"),
       tags$hr(),
       
-      # --- Upload ISTD amount/units map (per internal standard name) ---
+      # --- Upload IS amount/units map (per internal standard name) ---
       fileInput(
         inputId = "istd_map_csv",
-        label   = "Upload ISTD amount/units CSV",
+        label   = "Upload IS amount/units CSV",
         multiple = FALSE,
         accept   = c(".csv"),
         buttonLabel = "Browse..."
       ),
       checkboxInput(
         "use_istd_map_csv",
-        "Use uploaded ISTD CSV for normalization",
+        "Use uploaded IS CSV for normalization",
         value = TRUE
       ),
       helpText(
-        "CSV must contain exactly three columns: 'ISTD' (must match MSDIAL [IS] name),",
+        "CSV must contain exactly three columns: 'IS' (or legacy 'ISTD') (must match MSDIAL [IS] name),",
         " 'amount' (numeric), and 'units' (e.g., pmol, nmol). If missing or mismatched,",
-        " the app will fall back to the single ISTD amount input below.",
-        "\n If using the single ISTD amount method Metabolite names must contain '[IS]' to be matched"
+        " the app will fall back to the single IS amount input below.",
+        "\n If using the single IS amount method Metabolite names must contain '[IS]' to be matched"
       ),
       verbatimTextOutput("istd_map_summary"),
       
-      # --- ISTD amount (leave as-is) ---
-      numericInput("ISTD_vol", "ISTD amount (pmol):", 100, min = 1),
+      # --- IS amount (leave as-is) ---
+      numericInput("ISTD_vol", "IS amount (pmol):", 100, min = 1),
       
       tags$hr(),
       
@@ -663,7 +668,7 @@ ui <- fluidPage(
           selected = "token"
         ),
         helpText(tags$small(
-          "iQC, ISTD, and Blank samples are never averaged \u2014 each injection is kept separate."
+          "iQC, IS, and Blank samples are never averaged \u2014 each injection is kept separate."
         ))
       ),
       tags$hr(),
@@ -781,9 +786,9 @@ ui <- fluidPage(
                      helpText(tags$small(
                        "Internal standards are always retained from whichever ion mode",
                        "they were detected in, regardless of the settings above.",
-                       "When an ISTD CSV is provided, IS are matched to analytes by",
+                       "When an IS CSV is provided, IS are matched to analytes by",
                        tags$strong("class + ion mode + adduct type."),
-                       "If multiple ISTD entries match different adducts, one normalised",
+                       "If multiple IS entries match different adducts, one normalised",
                        "row is produced per matched adduct."
                      )),
                      br(),
@@ -1062,7 +1067,7 @@ ui <- fluidPage(
                    "Checks whether each imported MS-DIAL sample (", tags$code("_pos"), "/",
                    tags$code("_neg"), " suffix stripped) has a matching row in the uploaded",
                    " protein content CSV, and flags any protein CSV rows with no corresponding sample.",
-                   " ISTD, Blank, and iQC/QC samples are excluded from this check on both sides."
+                   " IS, Blank, and iQC/QC samples are excluded from this check on both sides."
                  )),
                  verbatimTextOutput("protein_match_summary"),
                  br(),
@@ -1074,7 +1079,7 @@ ui <- fluidPage(
                    "Flags potential outlier ", tags$strong("samples"), " (PCA Hotelling's T\u00b2 and iQC replicate deviation)",
                    " and potential outlier ", tags$strong("data points"), " within a lipid feature \u00d7 group",
                    " (modified Z-score or IQR rule), and applies any exclusions to every downstream tab",
-                   " from ", tags$strong("Plot single lipid"), " onward. ISTD, Blank, and iQC/QC-named samples",
+                   " from ", tags$strong("Plot single lipid"), " onward. IS, Blank, and iQC/QC-named samples",
                    " are never flagged or excluded here \u2014 they're outside the scope of biological outlier",
                    " detection and are handled by their own dedicated logic elsewhere in the app."
                  )),
@@ -1152,7 +1157,7 @@ ui <- fluidPage(
                      helpText(tags$small(
                        "Select one or more rows below, then use a button to override the automatic",
                        " decision for those specific samples \u2014 independently of the toggle above.",
-                       " ISTD/Blank/iQC samples are not listed here."
+                       " IS/Blank/iQC samples are not listed here."
                      )),
                      fluidRow(
                        column(width = 4, actionButton("sample_manual_exclude_btn", "Exclude selected",
@@ -1402,11 +1407,11 @@ ui <- fluidPage(
                        h5("PCA Options"),
                        checkboxInput("exclude_blank_pca", "Exclude samples named 'Blank'", value = TRUE),
                        checkboxInput("pca_show_iqc", "Include iQC samples (projected)", value = TRUE),
-                       checkboxInput("pca_show_istd", "Include ISTD-only samples (projected)", value = FALSE),
+                       checkboxInput("pca_show_istd", "Include IS-only samples (projected)", value = FALSE),
                        helpText(tags$small(
-                         "iQC (pooled biological QC) and ISTD-only injections (no biological matrix)",
+                         "iQC (pooled biological QC) and IS-only injections (no biological matrix)",
                          " are ", tags$strong("not the same thing"), " and are never treated as equivalent.",
-                         " ISTD samples are excluded by default \u2014 their lipid profile is so different",
+                         " IS samples are excluded by default \u2014 their lipid profile is so different",
                          " from a real sample that including them was previously showing up as a",
                          " spurious dominant point."
                        )),
@@ -1763,7 +1768,7 @@ ui <- fluidPage(
                                                "Background-subtracted"      = "value_bs"),
                                    selected = "norm"),
                        helpText(tags$small(
-                         "Units are detected automatically from your ISTD CSV and,",
+                         "Units are detected automatically from your IS CSV and,",
                          " if enabled, your protein normalisation settings."
                        )),
                        hr(),
@@ -2722,9 +2727,9 @@ server <- function(input, output, session) {
     res <- fn(samples)
     grps <- res$group
     
-    # Drop NA, empty, Unassigned, and any group label that looks like Blank/iQC/QC/ISTD/ITSD
+    # Drop NA, empty, Unassigned, and any group label that looks like Blank/iQC/QC/IS/ISTD/ITSD
     grps <- grps[!is.na(grps) & nzchar(grps) & grps != "Unassigned"]
-    grps <- grps[!grepl("^(blank|iqc|qc|istd|itsd)$", grps, ignore.case = TRUE)]
+    grps <- grps[!grepl("^(blank|iqc|qc|is|istd|itsd)$", grps, ignore.case = TRUE)]
     get_active_group_order()(grps)
   })
   
@@ -2877,7 +2882,7 @@ server <- function(input, output, session) {
     input$load_data,
     {
       validate(need(is.numeric(input$ISTD_vol) && !is.na(input$ISTD_vol) && input$ISTD_vol > 0,
-                    "Please enter a positive ISTD amount (pmol) before loading."))
+                    "Please enter a positive IS amount (pmol) before loading."))
       validate(need(!is.null(input$msdial_txts) && nrow(input$msdial_txts) >= 1,
                     "Upload at least one MS-DIAL .txt file."))
       validate(need(nrow(input$msdial_txts) <= 2,
@@ -2894,16 +2899,22 @@ server <- function(input, output, session) {
     ignoreInit = TRUE
   )
   
-  # ---- ISTD CSV reader & validator ----
+  # ---- IS CSV reader & validator ----
   istd_map_df <- reactive({
     req(input$istd_map_csv)
     df <- readr::read_csv(input$istd_map_csv$datapath, show_col_types = FALSE)
+    # Accept either "IS" (current column name) or "ISTD" (legacy) as the
+    # identifier column, so existing CSV files keep working. Internally the
+    # column is still called ISTD throughout this reactive and downstream.
+    if ("IS" %in% names(df) && !("ISTD" %in% names(df))) {
+      df <- dplyr::rename(df, ISTD = IS)
+    }
     # Basic column validation
     required <- c("ISTD", "amount", "units")
     missing  <- setdiff(required, names(df))
     validate(need(length(missing) == 0,
-                  paste0("ISTD CSV must have columns: ", paste(required, collapse=", "), 
-                         ". Missing: ", paste(missing, collapse=", "))))
+                  paste0("IS CSV must have columns: IS (or ISTD), amount, units",
+                         ". Missing: ", paste(gsub("^ISTD$", "IS", missing), collapse=", "))))
     # Coerce types and trim names
     df <- df %>%
       dplyr::mutate(
@@ -2912,28 +2923,28 @@ server <- function(input, output, session) {
         units  = stringr::str_trim(as.character(.data$units))
       )
     validate(need(all(is.finite(df$amount)),
-                  "ISTD CSV: 'amount' column must be numeric (all rows)."))
+                  "IS CSV: 'amount' column must be numeric (all rows)."))
     # Remove obvious empty rows
     df <- df %>% dplyr::filter(ISTD != "", !is.na(amount), units != "")
     df
   })
   
-  # ---- ISTD CSV summary against current dataset ----
+  # ---- IS CSV summary against current dataset ----
   output$istd_map_summary <- renderText({
-    if (is.null(input$istd_map_csv)) return("No ISTD CSV uploaded.")
+    if (is.null(input$istd_map_csv)) return("No IS CSV uploaded.")
     df <- tryCatch(istd_map_df(), error = function(e) NULL)
-    if (is.null(df)) return("ISTD CSV error — check columns: ISTD, amount, units.")
+    if (is.null(df)) return("IS CSV error — check columns: IS (or ISTD), amount, units.")
     is_table <- tryCatch(is_table_reactive(), error = function(e) NULL)
     if (is.null(is_table) || nrow(is_table) == 0) {
       return(paste0(
-        "ISTD CSV ok. Rows: ", nrow(df),
+        "IS CSV ok. Rows: ", nrow(df),
         " • Units present: ", paste(sort(unique(df$units)), collapse = ", "),
         "\n(Load MS-DIAL files first to see matching stats.)"
       ))
     }
     if (!"istd_name" %in% names(is_table)) {
       return(paste0(
-        "ISTD CSV ok. Rows: ", nrow(df),
+        "IS CSV ok. Rows: ", nrow(df),
         " • Units present: ", paste(sort(unique(df$units)), collapse = ", ")
       ))
     }
@@ -2941,7 +2952,7 @@ server <- function(input, output, session) {
     matched   <- sum(is_names %in% df$ISTD)
     unmatched <- setdiff(is_names, df$ISTD)
     paste0(
-      "ISTD CSV ok. Rows: ", nrow(df),
+      "IS CSV ok. Rows: ", nrow(df),
       " • Units present: ", paste(sort(unique(df$units)), collapse = ", "),
       "\nMatched [IS]: ", matched, " / ", length(is_names),
       if (length(unmatched) > 0)
@@ -3586,7 +3597,7 @@ server <- function(input, output, session) {
       )
     
     # Normalise analyte: join IS by class + ion.mode + adduct type
-    # If ISTD CSV provided, also join by adduct — produces one row per matched adduct
+    # If an IS CSV is provided, also join by adduct — produces one row per matched adduct
     df_norm <- df_bs %>%
       dplyr::left_join(
         is_table %>% dplyr::select(sample, sample_norm, class, ion.mode,
@@ -4154,7 +4165,7 @@ server <- function(input, output, session) {
   })
   
   # ---- Combined sample review table for manual override ----
-  # Lists every non-protected (ISTD/Blank/iQC excluded) sample with its PCA
+  # Lists every non-protected (IS/Blank/iQC excluded) sample with its PCA
   # Hotelling's T² score/flag and the current manual override state, so a
   # specific sample can be individually excluded or kept regardless of the
   # bulk "exclude all flagged" toggle.
@@ -4166,7 +4177,7 @@ server <- function(input, output, session) {
       dplyr::filter(!is_protected_sample(sample)) %>%
       dplyr::arrange(sample)
     
-    validate(need(nrow(base) > 0, "No non-ISTD/Blank/iQC samples available."))
+    validate(need(nrow(base) > 0, "No non-IS/Blank/iQC samples available."))
     
     flags <- sample_outlier_flags()
     
@@ -4283,7 +4294,7 @@ server <- function(input, output, session) {
     # ── Sample-level exclusion ────────────────────────────────────────────────
     # Auto-flagged (PCA T²) samples if the bulk toggle is on, plus/minus any
     # individual manual overrides. iQC deviation is informational only and never
-    # contributes to exclusion. ISTD/Blank/iQC samples are never excluded.
+    # contributes to exclusion. IS/Blank/iQC samples are never excluded.
     auto_flagged_samples <- if (isTRUE(input$outlier_exclude_samples)) {
       sf <- sample_outlier_flags()
       sf$sample[sf$is_outlier]
@@ -4324,7 +4335,7 @@ server <- function(input, output, session) {
   # Collapses multiple technical-injection rows down to one row per
   # (feature x biological sample) by averaging the numeric measurement
   # columns, when the "Average technical replicates" toggle is on. iQC,
-  # ISTD, and Blank samples are always passed through untouched — each
+  # IS, and Blank samples are always passed through untouched — each
   # injection is a distinct QC event and should never be averaged away.
   bg_norm_long_avg <- reactive({
     df <- bg_norm_long_resolved()
@@ -4718,7 +4729,7 @@ server <- function(input, output, session) {
         units_label <- u
       } else if (length(u) > 1) {
         showNotification(
-          "Lipid species plot: multiple ISTD units detected across data (mixed units).",
+          "Lipid species plot: multiple IS units detected across data (mixed units).",
           type = "warning", duration = 6
         )
         units_label <- "(mixed units)"
@@ -4830,7 +4841,7 @@ server <- function(input, output, session) {
           u <- na.omit(unique(df_pts$norm_units))
           if (length(u) == 1) u else {
             if (length(u) > 1) {
-              showNotification("Class-all plot: multiple ISTD units detected across data (mixed units).", type = "warning", duration = 6)
+              showNotification("Class-all plot: multiple IS units detected across data (mixed units).", type = "warning", duration = 6)
             }
             "(mixed units)"
           }
@@ -4973,8 +4984,8 @@ server <- function(input, output, session) {
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]"))
     
     # ── Group selection filter ────────────────────────────────────────────────
-    # iQC and ISTD samples are distinct: iQC is a pooled biological QC sample;
-    # a sample named ISTD/ITSD is typically an internal-standard-only injection
+    # iQC and IS samples are distinct: iQC is a pooled biological QC sample;
+    # a sample named IS/ISTD/ITSD is typically an internal-standard-only injection
     # with no biological matrix, so it must never be treated as equivalent to
     # iQC (mixing them was producing a spurious extra/dominant point). Both are
     # excluded from group filtering (neither has a real group label) and, if
@@ -4990,7 +5001,7 @@ server <- function(input, output, session) {
       df0_noiqc <- df0_noiqc[!is.na(grp_vec) & grp_vec %in% sel_grps, , drop = FALSE]
     }
     
-    # Scale both iQC and ISTD by the median biological protein content — neither
+    # Scale both iQC and IS by the median biological protein content — neither
     # is typically present in the protein CSV — purely so their projection lands
     # somewhere comparable; never affects the fit itself.
     if (isTRUE(input$use_protein_norm) && (nrow(df0_iqc) > 0 || nrow(df0_istd) > 0)) {
@@ -5010,7 +5021,7 @@ server <- function(input, output, session) {
       }
     }
     
-    # Recombine: filtered biological samples always included; iQC/ISTD added as
+    # Recombine: filtered biological samples always included; iQC/IS added as
     # supplementary rows only if their respective toggle is on
     df0 <- df0_noiqc
     if (show_iqc)  df0 <- dplyr::bind_rows(df0, df0_iqc)
@@ -5079,7 +5090,7 @@ server <- function(input, output, session) {
     }
     
     # FactoMineR's ind.sup mechanism requires supplementary rows to be
-    # identifiable by index — put biological (active) rows first, iQC/ISTD
+    # identifiable by index — put biological (active) rows first, iQC/IS
     # (supplementary) rows last, and record the split as an attribute.
     is_supp     <- is_qc_type_sample(rownames(df))
     ord         <- order(is_supp)
@@ -5320,18 +5331,18 @@ server <- function(input, output, session) {
       supp_coord$Sample <- supp_names
       supp_coord$Group  <- dplyr::case_when(
         is_iqc_sample(supp_names)  ~ "iQC",
-        is_istd_sample(supp_names) ~ "ISTD",
+        is_istd_sample(supp_names) ~ "IS",
         TRUE ~ "Other (supp.)"
       )
       supp_coord$Type <- "Supplementary"
       plot_df <- dplyr::bind_rows(plot_df, supp_coord)
     }
     
-    supp_levels <- if (has_supp) intersect(c("iQC", "ISTD", "Other (supp.)"), unique(plot_df$Group)) else character(0)
+    supp_levels <- if (has_supp) intersect(c("iQC", "IS", "Other (supp.)"), unique(plot_df$Group)) else character(0)
     grp_levels  <- c(sort(unique(active_coord$Group)), supp_levels)
     plot_df$Group <- factor(plot_df$Group, levels = grp_levels)
     
-    supp_colours <- c(iQC = "#444444", ISTD = "#d9822b", `Other (supp.)` = "#999999")
+    supp_colours <- c(iQC = "#444444", IS = "#d9822b", `Other (supp.)` = "#999999")
     palette <- scales::hue_pal()(length(setdiff(grp_levels, names(supp_colours))))
     names(palette) <- setdiff(grp_levels, names(supp_colours))
     palette <- c(palette, supp_colours[intersect(names(supp_colours), grp_levels)])
@@ -5358,7 +5369,7 @@ server <- function(input, output, session) {
       )
     
     if (has_supp) {
-      p <- p + ggplot2::labs(caption = "Triangles = supplementary points (iQC/ISTD); projected after fitting, so they never influenced the PCA axes.")
+      p <- p + ggplot2::labs(caption = "Triangles = supplementary points (iQC/IS); projected after fitting, so they never influenced the PCA axes.")
     }
     
     if (isTRUE(show_labels)) {
@@ -8925,7 +8936,7 @@ server <- function(input, output, session) {
     df_long <- df_long %>%
       dplyr::mutate(value_plot = .data[[measure_col]])
     
-    # Auto-detect the correct y-axis units from norm_units (set from the ISTD CSV,
+    # Auto-detect the correct y-axis units from norm_units (set from the IS CSV,
     # optionally suffixed with the protein unit when protein normalisation is on)
     # rather than letting the user pick an arbitrary, possibly-mismatched label.
     cbp_units_label <- NULL
@@ -8935,7 +8946,7 @@ server <- function(input, output, session) {
         cbp_units_label <- u
       } else if (length(u) > 1) {
         showNotification(
-          "Class bar plot: multiple ISTD units detected across data (mixed units).",
+          "Class bar plot: multiple IS units detected across data (mixed units).",
           type = "warning", duration = 6
         )
         cbp_units_label <- "(mixed units)"
