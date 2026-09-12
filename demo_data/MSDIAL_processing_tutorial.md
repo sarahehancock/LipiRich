@@ -35,7 +35,7 @@ Start a new analysis in MS-DIAL. The project title can be set as "Demo data pos.
 
 Click **Browse** to open the directory where the `.raw` files are located. Change the file type to "Raw file(*.raw)". Upload all positive ionisation raw files (files ending in `_pos`). Click **Next**.
 
-Set the sample type as "Sample" (samples), "Blank" (`blank_pos`), "Standard" (`ISTD_pos`), or "QC" (`iQC_x_pos`). Copy/paste "Class ID" and "Analytical order" from `Demo data metadata.xlsx` (available in this `demo_data/` folder). Ensure that "Acquisition" is set to "DDA". Click **Next**.
+Set the sample type as "Sample" (samples), "Blank" (`blank_pos`), "Standard" (`IS_pos`), or "QC" (`iQC_x_pos`). Copy/paste "Class ID" and "Analytical order" from `Demo data metadata.xlsx` (available in this `demo_data/` folder). Ensure that "Acquisition" is set to "DDA". Click **Next**.
 
 ### Measurement parameters
 
@@ -86,7 +86,7 @@ Click "Remove all", then select the following lipid classes:
 | Hex2Cer [M+H]+ |  |
 | ST [M+H-H2O]+ |  |
 
-Internal standard [IS] libraries must also be added. Click the plus symbol again, this time choosing "msp" under database type. Browse to `Lipid_ISTD_pos.msp` (download from github) and click **Open**. Under "Annotation method" change "Retention time tolerance" to 1 min.
+Internal standard [IS] libraries must also be added. Click the plus symbol again, this time choosing "msp" under database type. Browse to `Lipid_IS_pos.msp` (download from github) and click **Open**. Under "Annotation method" change "Retention time tolerance" to 1 min.
 
 Under "Annotation cut off" change "Dot product score" and "Weighted dot product score" to 150, and "Reverse dot product score" to 300. Change "Minimum number of matched spectrum" to 1. Under "Retention time setting" check "Use retention time for scoring". Finally, under "Annotation method setting" click on the Lipid_ISTD_pos library and use the up arrow to move it to the top.
 
@@ -124,7 +124,7 @@ Under "Peak spot navigator", check "Ref. match". Click the down arrowhead next t
 
 ### Manually check and align peaks
 
-Click on the Peak spot table. Sort the table by "Annotation method". Check that all internal standards have been detected from the `Lipid_ISTD_pos.msp` file.
+Click on the Peak spot table. Sort the table by "Annotation method". Check that all internal standards have been detected from the `Lipid_IS_pos.msp` file.
 
 If manual alignment is required, open the "EIC of aligned spot" tab at the top. Right-click and select "Peak curation (EICs overlay)" or "Peak curation (Sample table)" to manually align peaks.
 
