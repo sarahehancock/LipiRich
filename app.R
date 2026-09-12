@@ -1,6 +1,6 @@
 # app.R
 # --------------------------
-# LipiRich v0.7.0
+# LipiRich v0.8.0
 # Copyright (C) 2025–2026 Sarah E. Hancock
 #
 # This program is free software: you can redistribute it and/or modify it
@@ -36,11 +36,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/agpl-3.0.html>.
-# Version:  0.7.0
+# Version:  0.8.0
 # Tested with: MS-DIAL 5.5.251021, R 4.6.1, Bioconductor 3.23
 # --------------------------
 
-APP_VERSION <- "0.7.0"
+APP_VERSION <- "0.8.0"
 
 suppressPackageStartupMessages({
   library(shiny); library(DT); library(dplyr); library(readr); library(tidyr)
@@ -481,7 +481,7 @@ landing_page_ui <- function() {
           tags$ol(
             tags$li(tags$strong("Run alignment"), " \u2014 complete peak picking and alignment as normal. Review the result, tag correctly identified species with the ", tags$strong("\u2713 checkmark"), ", then choose ", tags$strong("Filter by current parameter"), " on export to pass only checked features to LipiRich."),
             tags$li(tags$strong("Export"), " \u2014 ", tags$em("Export \u2192 Alignment result"), " in ", tags$strong(".txt"), " format. LipiRich reads from row 5 (the four MS-DIAL header rows are skipped automatically)."),
-            tags$li(tags$strong("Sample naming"), " \u2014 end sample columns in ", tags$code("_pos"), " or ", tags$code("_neg"), " (e.g. ", tags$code("Sample1_pos"), "). These suffixes drive ion-mode resolution and sample-name deduplication."),
+            tags$li(tags$strong("Sample naming"), " \u2014 end sample columns in ", tags$code("_pos"), " or ", tags$code("_neg"), " (e.g. ", tags$code("Sample1_pos"), "). These suffixes drive ion-mode resolution and sample-name deduplication. If no columns carry either suffix, LipiRich falls back to resolving ion mode per feature from its adduct sign instead."),
             tags$li(tags$strong("Internal standards"), " \u2014 standard features must contain ", tags$code("[IS]"), " in the metabolite name, and their adduct must match the analytes they normalise (class + ion mode + adduct). These are detected automatically."),
             tags$li(tags$strong("Both polarities"), " \u2014 export each mode as its own .txt and upload both together (max 2 files); LipiRich merges them."),
             tags$li(tags$strong("Blank samples"), " \u2014 include at least one sample named ", tags$code("Blank"), " (case-insensitive) for background subtraction.")
@@ -1185,7 +1185,7 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Plot single lipid",
-                 h4("Step 4: Plot Individual Metabolites or Total by Class"),
+                 h4("Step 4: Plot Individual Lipid Species or Total by Class"),
                  fluidRow(
                    column(
                      width = 4,
@@ -1215,7 +1215,7 @@ ui <- fluidPage(
                                                 "Positive"  = "positive",
                                                 "Negative"  = "negative"),
                                     selected = "all", inline = TRUE),
-                       selectInput("met_name", "Metabolite name", choices = "Select a class first"),
+                       selectInput("met_name", "Lipid species", choices = "Select a class first"),
                        selectInput("met_adduct_filter", "Adduct filter",
                                    choices = c("All" = "all"),
                                    selected = "all"),
@@ -1261,7 +1261,7 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Plot lipids by class",
-                 h4("Step 5: Plot All Metabolites in a Selected Class by Group"),
+                 h4("Step 5: Plot All Lipid Species in a Selected Class by Group"),
                  fluidRow(
                    column(
                      width = 4,
@@ -1294,7 +1294,7 @@ ui <- fluidPage(
                        )),
                        selectInput(
                          "class_all_order",
-                         "Order metabolites by:",
+                         "Order lipid species by:",
                          choices = c(
                            "Abundance (high → low)" = "abundance_desc",
                            "Alphabetical (A → Z)"   = "alpha_asc"
@@ -1330,13 +1330,13 @@ ui <- fluidPage(
                      width = 8,
                      plotlyOutput("classAllPlot", height = "auto"),
                      br(), br(), br(),
-                     h5("Summary table (per-metabolite statistics for selected group):"),
+                     h5("Summary table (per-lipid-species statistics for selected group):"),
                      DTOutput("classAllSummary")
                    )
                  )
         ),
-        tabPanel("Export - wide",
-                 h4("Step 6: Export wide-format data"),
+        tabPanel("Export",
+                 h4("Step 6: Export data (wide or long format)"),
                  fluidRow(
                    column(
                      width = 4,
@@ -1375,8 +1375,14 @@ ui <- fluidPage(
                        downloadButton("download_export_wide", "Download wide CSV"),
                        br(), br(),
                        checkboxInput("export_include_metadata",
-                                     "Include group column in wide export header",
+                                     "Include group in wide export column headers",
                                      value = TRUE),
+                       helpText(tags$small(
+                         "Wide CSV: one row per lipid species, one column per sample \u2014 group is",
+                         " appended to each sample's column header when checked (e.g. \"sample1 (chow)\").",
+                         " Long CSV: one row per lipid species \u00d7 sample, with group always included",
+                         " as its own column."
+                       )),
                        br(),
                        downloadButton("download_export_long", "Download long-format CSV")
                      )
@@ -1487,7 +1493,7 @@ ui <- fluidPage(
         ),
         tabPanel("Statistics",
                  
-                 h4("Step 8: Statistical tests by metabolite / class"),
+                 h4("Step 8: Statistical tests by lipid species / class"),
                  
                  # ── Per-class summary panel ──────────────────────────────────
                  tags$details(
@@ -1578,14 +1584,14 @@ ui <- fluidPage(
                        selectInput("stats_class", "Lipid Class", choices = "Loading..."),
                        selectInput("stats_scope",
                                    "What to test:",
-                                   choices = c("All metabolites in class" = "all",
-                                               "Single metabolite"       = "single",
+                                   choices = c("All lipid species in class" = "all",
+                                               "Single lipid species"     = "single",
                                                "Class total (sum)"       = "total"),
                                    selected = "all"
                        ),
                        conditionalPanel(
                          condition = "input.stats_scope == 'single'",
-                         selectInput("stats_met_name", "Metabolite", choices = "Select a class first")
+                         selectInput("stats_met_name", "Lipid species", choices = "Select a class first")
                        ),
                        hr(),
                        # ── Groups inherited from Group Preview ───────────────────
@@ -1839,7 +1845,7 @@ ui <- fluidPage(
                    )
                  )
         ),
-        tabPanel("Heatmap - significant",
+        tabPanel("Heatmap",
                  tags$div(style = "font-family:monospace; font-size:.78em; letter-spacing:.08em; text-transform:uppercase; color:#0b6b66; font-weight:600; margin-bottom:2px;", "Plotting"),
                  h4("Step 9c: Heatmap of statistically significant features"),
                  fluidRow(
@@ -3408,10 +3414,52 @@ server <- function(input, output, session) {
     
     keep_meta <- c("Average Rt(min)", "Average Mz", "Metabolite name", "Adduct type")
     
+    # ---- Identify which columns hold sample intensity data ----
+    # Preferred: columns whose header ends in "_pos"/"_neg" (see landing-page
+    # naming guidance) — this is the only reliable way to tell which raw file
+    # a value came from when merging two uploads.
+    # Fallback: if NONE of the columns carry that suffix (e.g. a single
+    # polarity file, or sample names that don't follow the convention), the
+    # suffix-based selection would otherwise drop every sample column. Instead,
+    # identify sample columns by elimination against MS-DIAL 5's fixed,
+    # documented alignment-result metadata columns (Alignment ID, Ontology,
+    # SMILES, spectrum references, etc.) — everything else is treated as a
+    # sample. Each value's pos/neg mode is then resolved from its own row's
+    # Adduct type sign (via ion.mode, computed below) instead of the column
+    # name. Columns readr renamed for an exact duplicate name within one file
+    # (suffixed "...N") are never real samples — that pattern only arises from
+    # MS-DIAL's optional "Average/Stdev by class" summary columns, which
+    # reuse bare group names (e.g. "chow") and would otherwise be
+    # indistinguishable from a genuine unsuffixed sample column.
+    msdial_metadata_cols <- c(
+      "Alignment ID", "Average Rt(min)", "Average Mz", "Metabolite name", "Adduct type",
+      "Post curation result", "Fill %", "MS/MS assigned", "Reference RT", "Reference m/z",
+      "Formula", "Ontology", "INCHIKEY", "SMILES", "Annotation tag (VS1.0)",
+      "RT matched", "m/z matched", "MS/MS matched", "Comment",
+      "Manually modified for quantification", "Manually modified for annotation",
+      "Isotope tracking parent ID", "Isotope tracking weight number",
+      "RT similarity", "m/z similarity", "Simple dot product", "Weighted dot product",
+      "Reverse dot product", "Matched peaks count", "Matched peaks percentage",
+      "Total score", "S/N average", "Spectrum reference file name",
+      "MS1 isotopic spectrum", "MS/MS spectrum"
+    )
+    
+    sample_col_candidates <- setdiff(names(df), keep_meta)
+    sample_col_candidates <- sample_col_candidates[
+      !stringr::str_detect(sample_col_candidates, "\\.\\.\\.[0-9]+$")
+    ]
+    suffixed_cols <- stringr::str_subset(sample_col_candidates, "(?i)(_pos|_neg)(?:$|_)")
+    
+    sample_cols_to_use <- if (length(suffixed_cols) > 0) {
+      suffixed_cols
+    } else {
+      setdiff(sample_col_candidates, msdial_metadata_cols)
+    }
+    
     df_keep <- df %>%
       dplyr::select(
         dplyr::any_of(keep_meta),
-        dplyr::matches("(?i)(_pos|_neg)(?:$|_)", perl = TRUE)
+        dplyr::all_of(sample_cols_to_use)
       ) %>%
       dplyr::mutate(
         class = dplyr::case_when(
@@ -3445,9 +3493,15 @@ server <- function(input, output, session) {
         mode = dplyr::case_when(
           stringr::str_detect(sample_with_mode, "(?i)_pos(?:$|_)") ~ "pos",
           stringr::str_detect(sample_with_mode, "(?i)_neg(?:$|_)") ~ "neg",
+          # Fallback: the column name carries no pos/neg suffix — use this
+          # row's own ion mode (resolved from the Adduct type sign, above)
+          # instead of the sample name.
+          ion.mode == "positive" ~ "pos",
+          ion.mode == "negative" ~ "neg",
           TRUE ~ NA_character_
         ),
-        # strip mode and any trailing suffix (e.g., '.1')
+        # strip mode and any trailing suffix (e.g., '.1'); a no-op when the
+        # sample name carries no suffix to strip
         sample = stringr::str_replace(sample_with_mode, "(?i)(_pos|_neg).*", "")
       ) %>%
       dplyr::select(dplyr::all_of(keep_meta2), sample, mode, value)
@@ -4492,8 +4546,8 @@ server <- function(input, output, session) {
     cur <- isolate(input$met_name)
     sel <- if (!is.null(cur) && cur %in% choices) cur else "Total (class sum)"
     updateSelectInput(session, "met_name",
-                      choices  = if (length(choices) > 0) choices else "No metabolites in this class",
-                      selected = if (length(choices) > 0) sel else "No metabolites in this class")
+                      choices  = if (length(choices) > 0) choices else "No lipid species in this class",
+                      selected = if (length(choices) > 0) sel else "No lipid species in this class")
   }, ignoreInit = FALSE)
   
   # ── Adduct filter reactives ────────────────────────────────────────────────────
@@ -4664,7 +4718,7 @@ server <- function(input, output, session) {
         units_label <- u
       } else if (length(u) > 1) {
         showNotification(
-          "Metabolite plot: multiple ISTD units detected across data (mixed units).",
+          "Lipid species plot: multiple ISTD units detected across data (mixed units).",
           type = "warning", duration = 6
         )
         units_label <- "(mixed units)"
@@ -4803,7 +4857,12 @@ server <- function(input, output, session) {
   })
   
   # ---------- EXPORT ----------
-  export_wide_data <- reactive({
+  # Shared prep: filtered, grouped, valued long-format data. Both the wide
+  # (pivoted) and long (as-is) export reactives below build on this, so the
+  # filtering/grouping logic that drives what appears on the Export tab lives
+  # in exactly one place (see ways-of-working: downstream tabs reuse shared
+  # reactives rather than duplicating logic).
+  export_prepped_data <- reactive({
     req(bg_norm_long_avg())
     df <- bg_norm_long_avg() %>%
       dplyr::filter(!stringr::str_detect(`Metabolite name`, "\\[IS\\]")) %>%
@@ -4838,6 +4897,19 @@ server <- function(input, output, session) {
       df <- df %>% dplyr::mutate(export_value = .data[[measure_col]])
     }
     
+    df
+  })
+  
+  export_wide_data <- reactive({
+    df <- export_prepped_data()
+    
+    # "Include group column in wide export header" — since a wide table has
+    # one column per sample (not per row), the group is encoded into each
+    # sample's column header, e.g. "sample1" -> "sample1 (chow)".
+    if (isTRUE(input$export_include_metadata)) {
+      df <- df %>% dplyr::mutate(sample = paste0(sample, " (", group, ")"))
+    }
+    
     meta_cols <- c("plot_class", "Metabolite name", "Average Rt(min)", "Average Mz", "Adduct type", "ion.mode")
     
     wide <- df %>%
@@ -4849,6 +4921,18 @@ server <- function(input, output, session) {
       dplyr::arrange(plot_class, `Metabolite name`)
     
     wide
+  })
+  
+  export_long_data <- reactive({
+    df <- export_prepped_data()
+    meta_cols <- c("plot_class", "Metabolite name", "Average Rt(min)", "Average Mz", "Adduct type", "ion.mode")
+    
+    long <- df %>%
+      dplyr::select(dplyr::all_of(meta_cols), sample, group, export_value) %>%
+      dplyr::rename(value = export_value) %>%
+      dplyr::arrange(plot_class, `Metabolite name`, sample)
+    
+    long
   })
   
   observeEvent(bg_norm_long_avg(), {
@@ -4964,7 +5048,7 @@ server <- function(input, output, session) {
       df <- filter_blank_rownames(df, exclude = TRUE, exact = FALSE)
     }
     
-    validate(need(ncol(df) > 0, "No metabolite columns available for PCA."))
+    validate(need(ncol(df) > 0, "No lipid columns available for PCA."))
     
     df[] <- lapply(df, function(x) suppressWarnings(as.numeric(x)))
     if (ncol(df) > 0) {
@@ -5378,6 +5462,17 @@ server <- function(input, output, session) {
     }
   )
   
+  output$download_export_long <- downloadHandler(
+    filename = function() {
+      mode <- if (identical(input$export_display_mode, "percent")) "percent" else "absolute"
+      kind <- if (identical(input$export_value_type, "value_bs")) "bgsub" else "quant"
+      paste0("export_long_", kind, "_", mode, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      readr::write_csv(export_long_data(), file)
+    }
+  )
+  
   # ---------- UI renders ----------
   output$wideData <- renderDT({
     req(data_clean())
@@ -5593,7 +5688,7 @@ server <- function(input, output, session) {
       geom_errorbar(data = transform(df_sum, ymin = ymin, ymax = ymax), aes(x = group, ymin = ymin, ymax = ymax), width = 0.2, colour = "#333") +
       geom_jitter(data = df_pts, aes(x = group, y = value, text = pt_hover_text), width = 0.12, height = 0, alpha = 0.6, size = 2, colour = "#E45756") +
       labs(
-        title = paste0("Metabolite: ", input$met_name, " (Class: ", input$met_class, ")"),
+        title = paste0("Lipid species: ", input$met_name, " (Class: ", input$met_class, ")"),
         x = "Group",
         y = pd$ylab
       ) +
@@ -5691,7 +5786,7 @@ server <- function(input, output, session) {
       if (!is.null(group_levels) && length(group_levels) > 0) {
         plt <- plt %>%
           layout(
-            title = paste0("Metabolite: ", input$met_name, " (Class: ", input$met_class, ")"),
+            title = paste0("Lipid species: ", input$met_name, " (Class: ", input$met_class, ")"),
             xaxis = list(
               title = "Group",
               tickvals = seq_along(group_levels),
@@ -5704,7 +5799,7 @@ server <- function(input, output, session) {
       } else {
         plt <- plt %>%
           layout(
-            title = paste0("Metabolite: ", input$met_name, " (Class: ", input$met_class, ")"),
+            title = paste0("Lipid species: ", input$met_name, " (Class: ", input$met_class, ")"),
             xaxis = list(title = "Group"),
             yaxis = list(title = ylab),
             barmode = "overlay",
@@ -5726,7 +5821,7 @@ server <- function(input, output, session) {
   }
 
   output$download_met_png <- downloadHandler(
-    filename = function() paste0("metabolite_plot_", isolate(input$met_name), "_", Sys.Date(), ".png"),
+    filename = function() paste0("lipid_species_plot_", isolate(input$met_name), "_", Sys.Date(), ".png"),
     content = function(file) {
       dims <- isolate(.met_export_dims())
       fsz  <- isolate(input$met_export_fontsize %||% 12)
@@ -5739,7 +5834,7 @@ server <- function(input, output, session) {
   )
 
   output$download_met_svg <- downloadHandler(
-    filename = function() paste0("metabolite_plot_", isolate(input$met_name), "_", Sys.Date(), ".svg"),
+    filename = function() paste0("lipid_species_plot_", isolate(input$met_name), "_", Sys.Date(), ".svg"),
     content = function(file) {
       dims <- isolate(.met_export_dims())
       fsz  <- isolate(input$met_export_fontsize %||% 12)
@@ -5832,12 +5927,12 @@ server <- function(input, output, session) {
       coord_flip() +
       labs(
         title = paste0(
-          "All Metabolites in Class: ", input$class_all,
+          "All Lipid Species in Class: ", input$class_all,
           " (Group: ", input$class_all_selected_group, ", Order: ",
           if (identical(input$class_all_order, "alpha_asc")) "Alphabetical" else "Abundance",
           ")"
         ),
-        x = "Metabolite",
+        x = "Lipid species",
         y = pd$ylab
       ) +
       theme_minimal(base_size = fsz) +
@@ -5973,8 +6068,8 @@ server <- function(input, output, session) {
     }
     
     updateSelectInput(session, "stats_met_name",
-                      choices  = if (length(mets) > 0) mets else "No metabolites in this class",
-                      selected = if (length(mets) > 0) mets[1] else "No metabolites in this class")
+                      choices  = if (length(mets) > 0) mets else "No lipid species in this class",
+                      selected = if (length(mets) > 0) mets[1] else "No lipid species in this class")
   })
   
   
@@ -6208,6 +6303,9 @@ server <- function(input, output, session) {
     cols <- c(cols, intersect("groups", names(res)))
     
     res_disp <- res[, cols, drop = FALSE]
+    disp_names <- cols
+    disp_names[disp_names == "metabolite"] <- "Lipid species"
+    colnames(res_disp) <- disp_names
     datatable(res_disp, options = list(scrollX = TRUE), rownames = FALSE)
   })
   
@@ -6352,7 +6450,9 @@ server <- function(input, output, session) {
   output$posthocResults <- renderDT({
     ph <- posthoc_results()
     validate(need(!is.null(ph) && nrow(ph) > 0, "No post-hoc results to display."))
-    datatable(ph, options = list(scrollX = TRUE), rownames = FALSE)
+    ph_disp <- ph
+    names(ph_disp)[names(ph_disp) == "metabolite"] <- "Lipid species"
+    datatable(ph_disp, options = list(scrollX = TRUE), rownames = FALSE)
   })
   
   # ---- Per-class detection & significance summary ----
@@ -6870,7 +6970,7 @@ server <- function(input, output, session) {
       posthoc_choices = input$posthoc %||% character(0),
       base_size     = 14
     )
-    validate(need(!is.null(p), paste0("No data for metabolite '", met, "'.")))
+    validate(need(!is.null(p), paste0("No data for lipid species '", met, "'.")))
     p
   })
   
@@ -8127,15 +8227,15 @@ server <- function(input, output, session) {
     # (including "-O" where relevant and present in your data).
     list(
       # Kennedy pathway branches (product-side class membership)
-      "Kennedy-PC (DAG→PC)"                 = c("PC", "PC-O"),
-      "Kennedy-PE (DAG→PE)"                 = c("PE", "PE-O"),
+      "Kennedy-PC (DG→PC)"                  = c("PC", "PC-O"),
+      "Kennedy-PE (DG→PE)"                  = c("PE", "PE-O"),
       
       # NEW: Specific glycerophospholipid synthesis steps (product classes)
-      "PG synthesis (DAG→PG)"               = c("PG"),
+      "PG synthesis (DG→PG)"                = c("PG"),
       "CL synthesis (PG→CL)"                = c("CL"),
       
       # Storage & CDP-DAG branch
-      "DGAT (DAG→TG; storage)"              = c("TG"),
+      "DGAT (DG→TG; storage)"               = c("TG"),
       "CDP-DAG branch (PI/PG/CL)"           = c("PI", "PG", "CL"),
       "PA node (upstream glycerolipid)"     = c("PA"),
       
@@ -8198,10 +8298,10 @@ server <- function(input, output, session) {
       ),
       
       # --- NEW: Additional glycerophospholipid pathways ---
-      "PG synthesis (PG/DAG)" = list(
+      "PG synthesis (PG/DG)" = list(
         type = "ratio",
         num  = c("PG"),
-        den  = c("DAG")
+        den  = c("DG")
       ),
       "CL synthesis (CL/PG)" = list(
         type = "ratio",
@@ -8210,25 +8310,25 @@ server <- function(input, output, session) {
       ),
       
       # --- EXISTING SCORES (unchanged) ---
-      "TAG storage (TG/DAG)" = list(
+      "TG storage (TG/DG)" = list(
         type = "ratio",
         num  = c("TG"),
-        den  = c("DAG")
+        den  = c("DG")
       ),
-      "DGAT activity (TG/(TG + DAG))" = list(
+      "DGAT activity (TG/(TG + DG))" = list(
         type = "fraction",
         num  = c("TG"),
-        den  = c("TG", "DAG")
+        den  = c("TG", "DG")
       ),
-      "PC synthesis (PC/DAG)" = list(
+      "PC synthesis (PC/DG)" = list(
         type = "ratio",
         num  = c("PC", "PC-O"),
-        den  = c("DAG")
+        den  = c("DG")
       ),
-      "PE synthesis (PE/DAG)" = list(
+      "PE synthesis (PE/DG)" = list(
         type = "ratio",
         num  = c("PE", "PE-O"),
-        den  = c("DAG")
+        den  = c("DG")
       ),
       "PEMT (PC/PE)" = list(
         type = "ratio",

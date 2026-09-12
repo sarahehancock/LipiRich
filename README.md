@@ -1,10 +1,10 @@
-# LipiRich <img src="https://img.shields.io/badge/version-0.7.0-blue" alt="v0.7.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.6.1-informational" alt="R 4.6.1"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
+# LipiRich <img src="https://img.shields.io/badge/version-0.8.0-blue" alt="v0.8.0"/> <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"/> <img src="https://img.shields.io/badge/R-%3E%3D4.6.1-informational" alt="R 4.6.1"/> <img src="https://img.shields.io/badge/live%20app-lipirich.sarahehancock.com-brightgreen" alt="Live App"/>
 
 **LipiRich** is an open-source, browser-based Shiny application for the normalisation, statistical analysis, and visualisation of untargeted lipidomics data exported from [MS-DIAL 5](https://systemsomicslab.github.io/compms/msdial/main.html). It requires no programming knowledge and runs entirely in a web browser.
 
 > Developed and tested with **MS-DIAL 5.5.251021**, R 4.6.1, and Bioconductor 3.23.
 
-> ⚠️ **Pre-publication software (v0.7.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
+> ⚠️ **Pre-publication software (v0.8.0):** LipiRich is under active development. A citable preprint and demonstration dataset will be released alongside v1.0.0. Please check the [GitHub repository](https://github.com/sarahehancock/LipiRich) for the latest updates and to report issues.
 
 ---
 
@@ -104,14 +104,14 @@ Go to **Export → Alignment result** and select the `.txt` format. LipiRich ski
 
 ### Step 3 — Sample naming conventions
 
-Sample column names **must end in `_pos` or `_neg`** to indicate ion mode. LipiRich uses these suffixes to identify, merge, and deduplicate ion mode measurements.
+Sample column names should end in `_pos` or `_neg` to indicate ion mode. LipiRich uses these suffixes to identify, merge, and deduplicate ion mode measurements.
 
 ```
 Sample1_pos   Sample2_pos   Blank_pos
 Sample1_neg   Sample2_neg   Blank_neg
 ```
 
-If a sample name does not contain `_pos` or `_neg`, it will not be detected as a sample column.
+**Fallback (no suffix present):** if none of the sample columns carry a `_pos`/`_neg` suffix — e.g. a single-polarity upload, or sample names that don't follow the convention — LipiRich identifies sample columns by elimination against MS-DIAL 5's fixed alignment-result metadata columns, and resolves each value's ion mode from its own row's Adduct type sign instead of the column name. This is a safety net, not a replacement for the naming convention: it can't distinguish two genuinely different samples that happen to share a name across your positive- and negative-mode files, so suffixing remains the more robust choice whenever you're merging two files.
 
 ### Step 4 — Include blank samples
 
@@ -347,6 +347,8 @@ The Synthesis Pathways tab provides two views of curated **enzyme activity proxy
 
 For the ether lipid branch, plasmanyl-PC is scored two ways: **direct** (PC-O plasmanyl/DG-O), reflecting the CDP-choline route straight from the shared ether precursor, and **headgroup-conversion** (PC-O plasmanyl/PE-O plasmanyl), reflecting the alternative route via plasmanyl-PE. Plasmenyl-PC is only scored via headgroup conversion (PC-O plasmenyl/PE-O plasmenyl), since mammalian plasmalogen desaturation is PE-selective and there is no direct route from DG-O to plasmenyl-PC.
 
+> **A note on nomenclature:** the plasmanyl/plasmenyl scores use the notation `PE-O XX:0` and `PE-O XX:≥1` (similarly for PC-O). This is **not** sum composition — it refers to the double-bond count on the ether-linked chain specifically, drawn from MS-DIAL's molecular-species (chain-resolved) identification (e.g. the resolved chain in `PE-O 18:0_20:4`), not the lipid's total carbon:double-bond sum (e.g. `PE-O 38:4`). A chain with 0 double bonds on the ether-linked position is classed as plasmanyl (alkyl ether); ≥1 is classed as plasmenyl (vinyl ether/plasmalogen). Species with only sum-composition identification (no resolved chain) cannot be classified either way and are excluded from these five scores' numerator/denominator — they still contribute to every other score on this tab, which use class-level totals regardless of resolution depth.
+
 > **Interpret with care:** these scores are built from established *mammalian* synthesis pathways. Some steps involve enzymes with overlapping or tissue-dependent substrate preferences, and a given score may reflect more than one biosynthetic route contributing to the same lipid pool. Treat them as pathway-activity indicators rather than direct measurements of flux through a single enzymatic step.
 
 ### Scores heatmap
@@ -360,7 +362,7 @@ Runs a **t-test** (2 groups) or **one-way ANOVA** (≥ 3 groups) on each score's
 - A **lollipop plot** of −log10(p_adj) per score, sorted by significance and coloured by which group has the higher mean.
 - A **results table** with score name, test type, groups compared, test statistic, log2FC (t-test only), direction, p, and p_adj.
 
-> Scores are currently based on lipid class-level totals. Acyl chain-resolved scoring is planned for a future release.
+> Most scores are based on lipid class-level totals and work regardless of identification depth. The five plasmanyl/plasmenyl scores are the exception — see the nomenclature note above.
 
 ---
 
@@ -433,7 +435,7 @@ LipiRich/
 
 If you use LipiRich in your research, please cite:
 
-> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.7.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
+> Hancock, SE. (2026). *LipiRich: A Shiny application for normalisation, statistics, and visualisation of MS-DIAL lipidomics data* (v0.8.0). GitHub: https://github.com/sarahehancock/LipiRich. DOI: [pending]
 
 ---
 

@@ -8,6 +8,49 @@
 
 ---
 
+## [0.8.0] — 2026-09-12
+
+### Added
+
+#### Ion mode detection now falls back to adduct sign when sample names lack a `_pos`/`_neg` suffix
+Previously, sample columns were only recognised if their header ended in `_pos` or `_neg` — the naming convention documented on the landing page and in the README. If none of a file's sample columns carried that suffix (a single-polarity upload, or sample names that simply didn't follow the convention), the suffix-based selection matched nothing and every sample column was silently dropped from `data_clean()`, with no data reaching any downstream tab.
+
+`data_clean()` now falls back, when no suffixed columns are found, to identifying sample columns by elimination against MS-DIAL 5's fixed, documented alignment-result metadata columns (Alignment ID, Ontology, INCHIKEY, SMILES, spectrum references, and so on — 34 columns in total). Each value's ion mode is then resolved from its own row's Adduct type sign (already used elsewhere to set `ion.mode`) instead of from the column name. An early version of this fallback used a numeric-content heuristic instead of the metadata denylist; tested against this project's demo dataset, it incorrectly captured several genuinely numeric MS-DIAL metadata columns (Alignment ID, Fill %, Reference RT, Reference m/z, Annotation tag) as fake samples, so it was replaced with the denylist approach. A second edge case surfaced in the same testing: MS-DIAL's optional "Average/Stdev by class" summary columns reuse bare group names (e.g. `chow`) and would otherwise be indistinguishable from a genuine unsuffixed sample column; these are now excluded via the `...N` suffix `readr` applies when it deduplicates an exact-duplicate column name within one uploaded file — a pattern no real sample name ever produces, since sample names are unique to begin with.
+
+Regression-tested against this project's demo dataset (both files, real suffixes intact) and a synthetic copy with every `_pos`/`_neg` suffix stripped: the fallback path selected exactly the same 29 sample columns as the suffix-based path (58 suffixed columns collapsing to 29 base names), and the two paths' final wide-format tables were confirmed identical across all 906 features × 29 samples, with zero MS-DIAL metadata columns leaking into either.
+
+### Fixed
+
+#### "Download long-format CSV" on the Export tab had no server-side handler at all
+The button was wired up in the UI but `output$download_export_long` was never defined anywhere in the server logic, so clicking it did nothing. Fixed by factoring the tab's filtering/grouping logic (blank exclusion, iQC exclusion, class selection, grouping, percent-of-class conversion) out of `export_wide_data()` into a new shared reactive, `export_prepped_data()`, and adding `export_long_data()` and the missing `download_export_long` handler alongside it — following the project's existing convention of downstream tabs sharing reactives rather than duplicating logic.
+
+#### "Include group column in wide export header" checkbox had no effect
+`input$export_include_metadata` was read nowhere in the server code, so the checkbox did nothing regardless of its state. It now appends the group name to each sample's column header when checked (e.g. `sample1` → `sample1 (chow)`), since a wide table has one column per sample rather than one row per sample-group pair. The long-format CSV always includes group as its own column, checkbox notwithstanding.
+
+#### Several Synthesis Pathway scores were matching against a lipid class that doesn't exist in the data
+Five pathway scores (PG synthesis, TG storage, DGAT activity, PC synthesis, PE synthesis) used the literal string `"DAG"` as a denominator class to match against `plot_class`, but the app's actual class label for diacylglycerol is `"DG"` (confirmed elsewhere in the app's own default class lists). Since `"DAG"` never matched any real class, these denominators silently resolved to zero; given the score-computation code's zero-handling logic, this produced near-infinite/garbage ratio values rather than sensible numbers or a clean `NA`. Fixed by correcting the matching values, not just display labels, in `pathway_scores_defs()`.
+
+### Changed
+
+#### "Metabolite"/"metabolite name" replaced with lipid-specific terminology throughout the UI
+MS-DIAL's own column is literally named "Metabolite name," but LipiRich is lipid-specific, so every place the app itself displays or labels this concept — plot titles, axis labels, dropdown labels, validation/warning messages, download filenames, and (found during this pass) a "metabolite" column header that was leaking directly into the Statistics results and post-hoc results tables — now reads "Lipid species" or "lipid" as appropriate. MS-DIAL's own "Metabolite name" field (the actual column read from the uploaded file, referenced 100+ times internally) and code comments describing it are unchanged, since renaming those would risk breaking data parsing for no user-visible benefit.
+
+#### Tab renames
+- "Export - wide" → "Export", since the tab has always held both the wide- and long-format CSV downloads (the landing page's Step 6 description already called it "Export").
+- "Heatmap - significant" → "Heatmap" (the landing page's Step 9c description already called it "Heatmap").
+
+#### "TAG"/"DAG" standardised to "TG"/"DG" in Synthesis Pathway labels
+"TAG storage" → "TG storage"; every "…/DAG" label → "…/DG", matching the class-label convention used throughout the rest of the app. "CDP-DAG" is unchanged in three pathway names, since that's the standard biochemical name for that specific metabolic intermediate, not a class label.
+
+### Docs
+
+#### README: clarified ether-species pathway-score nomenclature
+Added a note to the Synthesis Pathways section explaining that the plasmanyl/plasmenyl score notation (`PE-O XX:0`, `PE-O XX:≥1`) refers to the double-bond count on the ether-linked chain specifically, from MS-DIAL's molecular-species (chain-resolved) identification — not sum composition, which cannot distinguish plasmanyl from plasmenyl since it only reports the total double bonds across both chains. Also corrected a stale line claiming all scores use class-level totals with chain-resolved scoring "planned for a future release" — the plasmanyl/plasmenyl scores already require chain-resolved identification and exclude sum-composition-only species from their numerator/denominator.
+
+Also updated the sample-naming section to describe the new adduct-based fallback (see Added, above), while still recommending the `_pos`/`_neg` suffix convention as the more robust choice when merging two files.
+
+---
+
 ## [0.7.0] — 2026-09-01
 
 ### Added
